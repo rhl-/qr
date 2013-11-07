@@ -1,4 +1,7 @@
+#ifndef T10_MATRIX_OPERATIONS
+#define T10_MATRIX_OPERATIONS
 #include <iostream>
+namespace t10 {
 //should be above
 //template< ... >
 //void matVecMult. also camelcase is for chumps and is ugly. use mat_vec_mult(A,b,c).
@@ -48,3 +51,5 @@ template<class Matrix, class Vector> void matVecMult (const Matrix & a, const Ve
  *	}
  *
  * */
+} //end namespace T10 namespace
+#endif //ifndef T10_MATRIX_OPERATIONS
