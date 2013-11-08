@@ -1,45 +1,33 @@
 #include <iostream>
 #include <vector>
 #include "matrix_operations.h"
-using namespace std; //NEVER DO THIS EVER EVER EVER.
+
+typedef std::vector<int> Vector;
 int main ()
 {
-vector< vector<int> > a; 
-vector<int> p; 
-p.push_back(1); 
-p.push_back(2); 
-p.push_back(3); 
-vector<int> q; 
-q.push_back(4); 
-q.push_back(5); 
-q.push_back(6); 
- 
-a.push_back(p); 
-a.push_back(q); 
+std::vector< Vector > A(3,std::vector<int>(2,1));
 
-vector<int> b;
+
+Vector b;
 b.push_back(3);
 b.push_back(2);
 b.push_back(1);
 
-vector<int> c;
-matVecMult(a, b, c);
-for (int i = 0; i < a.size(); i++)
-{
-for (int j = 0; j < a[0].size(); j++)
-{
-cout << a[i][j] << " ";
-}
-cout << endl;
+Vector c(2,0);
+t10::mat_vec_mult(A, b, c);
+for (int i = 0; i < A.size(); i++){
+	for (int j = 0; j < A[0].size(); j++){
+		std::cout << A[i][j] << " ";
+	}
+	std::cout << std::endl;
 }
 
-for (vector< vector<int> >::size_type u = 0; u < c.size(); u++) 
-{  
-cout << c[u] << " "; 
+for (std::vector< Vector >::size_type u = 0; u < c.size(); u++) {  
+	std::cout << c[u] << " " << std::endl; 
 } 
-cout << endl; 
+std::cout << std::endl; 
 
-cout << c.size() << endl;
+std::cout << "size of c " << c.size() << std::endl;
  
 return 0;
 }
