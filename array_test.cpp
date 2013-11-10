@@ -9,9 +9,9 @@ std::vector< Vector > A(3,std::vector<int>(2,1));
 
 
 Vector b;
-b.push_back(3);
-b.push_back(2);
-b.push_back(1);
+b.push_back(3.0);
+b.push_back(2.0);
+b.push_back(1.0);
 
 Vector c(2,0);
 t10::mat_vec_mult(A, b, c);
@@ -27,8 +27,13 @@ for (std::vector< Vector >::size_type u = 0; u < c.size(); u++) {
 } 
 std::cout << std::endl; 
 
-std::cout << "size of c " << c.size() << std::endl;
- 
+Vector v(3,0.0);
+double d;
+t10::house(b,v,d);
+printf ("d=%f\n",d);
+for (std::vector<Vector>::size_type u = 0; u < v.size(); u++) {
+	printf ("v[u]%f\n",v[u]);
+} 
 return 0;
 }
 
