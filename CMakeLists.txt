@@ -18,6 +18,6 @@ ${Boost_INCLUDE_PATH}
 )
 
 link_directories (${MPI_LIBRARIES})
-add_executable(qr qr.cpp)
+add_executable(qr array_test.cpp)
 
 target_link_libraries(qr ${MPI_LIBRARIES} ${Boost_LIBRARIES})

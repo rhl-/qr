@@ -1,12 +1,13 @@
 #include <iostream>
 #include <vector>
+#include <iomanip> 
 #include "matrix_operations.h"
 
-typedef std::vector<int> Vector;
-int main ()
-{
-std::vector< Vector > A(3,std::vector<int>(2,1));
+typedef std::vector<double> Vector;
+int main () {
+std::vector< Vector > A(3,Vector(2,1));
 
+std::cout << std::fixed << std::setprecision( 2 );
 
 Vector b;
 b.push_back(3.0);
@@ -31,8 +32,8 @@ Vector v(3,0.0);
 double d;
 t10::house(b,v,d);
 printf ("d=%f\n",d);
-for (std::vector<Vector>::size_type u = 0; u < v.size(); u++) {
-	printf ("v[u]%f\n",v[u]);
+for (typename Vector::const_iterator i  = v.begin(); i != v.end(); ++i) {
+	std::cout << *i << std::endl;
 } 
 return 0;
 }
