@@ -31,7 +31,7 @@ std::cout << std::endl;
 Vector v(3,0.0);
 double d;
 t10::house(b,v,d);
-printf ("d=%f\n",d);
+std::cout << "d = " << d << std::endl;
 for (typename Vector::const_iterator i  = v.begin(); i != v.end(); ++i) {
 	std::cout << *i << std::endl;
 } 
