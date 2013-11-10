@@ -41,7 +41,6 @@ void house(const Vector & x, Vector & v, double & b) {
 		std::cout << "v[0] " << v[0] << std::endl;
 		for (std::size_t i = 0; i < v.size(); ++i) {
 			v[i] = (double)v[i]/(double)v[0];
-			std::cout << "v[i] " << v[i] << std::endl;
 		}
 	}
 }
