@@ -52,7 +52,8 @@ int main( int argc, char * argv[]){
 	std::cout << " ------------------------------------------------- " << std::endl;	
 	//Hessenberg Reduction Test
 	std::cout << "Input Matrix: " << M << std::endl;
-	t10::qr(M);
+	t10::hessenberg(M);
 	std::cout << "M = " << M << std::endl;
 	std::cout << "A = " << A << std::endl;
+	t10::qr_iteration(M);
 }
