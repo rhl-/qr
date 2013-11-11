@@ -7,7 +7,7 @@ typedef std::vector<double> Vector;
 int main () {
 std::vector< Vector > A(3,Vector(2,1));
 
-std::cout << std::fixed << std::setprecision( 2 );
+std::cout << std::fixed << std::setprecision( 5 );
 
 Vector b;
 b.push_back(3.0);
@@ -23,15 +23,10 @@ for (int i = 0; i < A.size(); i++){
 	std::cout << std::endl;
 }
 
-for (std::vector< Vector >::size_type u = 0; u < c.size(); u++) {  
-	std::cout << c[u] << " " << std::endl; 
-} 
-std::cout << std::endl; 
-
 Vector v(3,0.0);
-double d;
-t10::house(b,v,d);
-std::cout << "d = " << d << std::endl;
+double beta;
+t10::house(b,v,beta);
+std::cout << "beta = " << beta << std::endl;
 for (typename Vector::const_iterator i  = v.begin(); i != v.end(); ++i) {
 	std::cout << *i << std::endl;
 } 
