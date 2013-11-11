@@ -8,13 +8,23 @@
 namespace ublas = boost::numeric::ublas;
 
 namespace t10 {
+	template< typename Matrix>
+	void apply_givens_left( Matrix & M, const std::size_t i, const std::size_t j){}
+	template< typename Matrix>
+	void apply_givens_right( Matrix & M, const std::size_t i, const std::size_t j){}
 
 	//TODO: Specialize for symmetric matrices
 	template< typename Matrix, typename Matrix_list>
 	void qr_iteration( Matrix & H, Matrix_list & Q){}
 	
 	template< typename Matrix>
-	void qr_iteration( Matrix & H){}
+	void qr_iteration( Matrix & H, double tol=1e-8){
+		//TODO: Shift H	
+		//TODO: Use tol to achieve deflation
+		for (std::size_t i = 0; i < H.size1()-1; ++i){ apply_givens_left(H,i,i+1); }
+		for (std::size_t i = 0; i < H.size1()-1; ++i){ apply_givens_right(H,i,i+1); }
+		//TODO: Unshift H
+	}
 
 	template< typename Vector>
 	void compute_householder_vector( Vector & v){
