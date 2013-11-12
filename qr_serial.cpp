@@ -4,6 +4,7 @@
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/io.hpp>
 #include<algorithm>
+#include <boost/numeric/ublas/banded.hpp> //for banded_adaptor
 
 namespace ublas = boost::numeric::ublas;
 
@@ -11,6 +12,7 @@ typedef ublas::vector< double > Vector;
 typedef ublas::matrix< double> Matrix;
 typedef ublas::zero_matrix< double> Zero_matrix;
 typedef ublas::zero_vector< double> Zero_vector;
+typedef typename ublas::diagonal_adaptor< Matrix> Diagonal_adapter;
 int main( int argc, char * argv[]){
 	const double test_case[3][3] = 
        {{5,3,3},
@@ -56,4 +58,7 @@ int main( int argc, char * argv[]){
 	std::cout << "M = " << M << std::endl;
 	std::cout << "A = " << A << std::endl;
 	t10::qr_iteration(M);
+	Diagonal_adapter D(M);
+	std::cout << "D = " << D << std::endl;
+	
 }

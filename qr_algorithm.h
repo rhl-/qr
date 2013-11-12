@@ -6,9 +6,29 @@
 #include <boost/numeric/ublas/matrix_proxy.hpp> //for slices
 #include <boost/numeric/ublas/vector_proxy.hpp> //for slices
 #include <boost/numeric/ublas/io.hpp> //io
+#include <sstream>
 namespace ublas = boost::numeric::ublas;
 
 namespace t10 {
+	template< typename Matrix, typename String>
+	String print_matrix( const Matrix & M, String & str){
+		std::stringstream ss;
+		ss << M;
+		str = ss.str();
+		std::size_t lefts = str.find(std::string("["));
+		std::size_t rights = str.find(std::string("]"));
+		str.replace(lefts,rights-lefts+1,"");
+		std::size_t found = str.find(std::string("(("));
+		str.replace(found,2,std::string("\n("));
+		found = str.find(std::string("))"));
+		str.replace(found,2,std::string(")\n"));
+		found = str.find(std::string("),"));
+		while( found != std::string::npos){
+			str.replace(found,2,std::string(")\n"));
+			found = str.find(std::string("),"));
+		}
+		return str;	
+	}
 	//GVL Section 5.1.9
 	template< typename Value>
 	void compute_givens(const Value & a, const Value & b, Value & g0, Value & g1){
@@ -25,26 +45,26 @@ namespace t10 {
 	}
 
 	template< typename Matrix>
-	void apply_givens_left( Matrix & M, const std::size_t i, const std::size_t j){
+	void apply_givens_left( Matrix & M, const std::size_t i){
 		typename Matrix::value_type g0=0.0,g1=0.0;
 		compute_givens(M(i,i),M(i+1,i), g0,g1);
-		for(std::size_t k = 0; k < M.size2(); ++k){
+		for(std::size_t k = i; k < M.size2(); ++k){
 			const double ti = M(i,k);
-			const double tj = M(j,k);
+			const double tj = M(i+1,k);
 			M(i,k) = g0*ti - g1*tj;
-			M(j,k) = g0*ti + g1*tj;
+			M(i+1,k) = g1*ti + g0*tj;
 		}
 			
 	}
 	template< typename Matrix>
-	void apply_givens_right( Matrix & M, const std::size_t i, const std::size_t j){
+	void apply_givens_right( Matrix & M, const std::size_t i){
 		typename Matrix::value_type g0=0.0,g1=0.0;
 		compute_givens(M(i,i),M(i+1,i), g0,g1);
-		for(std::size_t k = 0; k < M.size1(); ++k){
+		for(std::size_t k = i; k < M.size1(); ++k){
 			const double ti = M(k,i);
-			const double tj = M(k,j);
-			M(k,i) = g0*ti - g1*tj;
-			M(k,j) = g0*ti + g0*tj;
+			const double tj = M(k,i+1);
+			M(k,i) = g0*ti + g1*tj;
+			M(k,i+1) = -g1*ti + g0*tj;
 		}
 	}
 
@@ -53,25 +73,29 @@ namespace t10 {
 	void qr_iteration( Matrix & H, Matrix_list & Q){}
 	
 	template< typename Matrix>
-	void qr_iteration( Matrix & H, double tol=1e-8){
+	void qr_iteration( Matrix & H, double tol=1e-16){
 		std::size_t n = H.size1();
 		typedef typename ublas::diagonal_adaptor< Matrix> Diagonal_adapter;
 		typedef typename ublas::scalar_matrix< typename Matrix::value_type> Scalar;
 		typedef ublas::diagonal_adaptor< Scalar> Diagonal_scalar;
-		//Choose and apply shift 
+		//Choose and apply shift
+		std::string sout;
+		do{
+		std::cout << "----" << std::endl;
 		Scalar mu_s(n,n,H(n-1,n-1));
 		const Diagonal_scalar mu( mu_s );
 		Diagonal_adapter D(H);
 		D -= mu;
 		//TODO: Use tol to achieve deflation
-		for (std::size_t i = 0; i < n-1; ++i){ 
-			apply_givens_left(H,i,i+1);
-			std::cout << "After left apply: " << H << std::endl; 
-			apply_givens_right(H,i,i+1); 
-			std::cout << "After right apply: " << H << std::endl; 
+		for (std::size_t i = 0; i < n-1; ++i){ apply_givens_left(H,i); 
 		}
+		std::cout << "Left Apply: H = " << print_matrix( H, sout) << std::endl;
+		for (std::size_t i = 0; i < n-1; ++i){ apply_givens_right(H,i); }
+		std::cout << "Right Apply H = " << print_matrix( H, sout) << std::endl;
 		//Unshift
 		D += mu;
+		std::cout << "Shift: H = " << print_matrix( H, sout) << std::endl;
+		} while( std::fabs(H(n-1,n-2)) > tol);
 	}
 
 	template< typename Vector>
