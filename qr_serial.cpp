@@ -45,6 +45,7 @@ int main( int argc, char * argv[]){
 			A(i,j) = correct_hess[i][j];
 		}
 	}
+	
 	//Householder Vector Test
 	std::cout << "Input: " << V << std::endl;
 	t10::compute_householder_vector(V);
@@ -53,12 +54,12 @@ int main( int argc, char * argv[]){
 	std::cout << "V: " << V << " correct V: " << CV << std::endl;
 	std::cout << " ------------------------------------------------- " << std::endl;	
 	//Hessenberg Reduction Test
-	std::cout << "Input Matrix: " << M << std::endl;
+	std::cout << "Input Matrix: " << t10::print_matrix(M)<< std::endl;
 	t10::hessenberg(M);
-	std::cout << "M = " << M << std::endl;
-	std::cout << "A = " << A << std::endl;
+	std::cout << "M = " << t10::print_matrix(M) << std::endl;
+	std::cout << "A = " << t10::print_matrix(A) << std::endl;
 	t10::qr_iteration(M);
 	Diagonal_adapter D(M);
-	std::cout << "D = " << D << std::endl;
+	std::cout << "D = " << t10::print_matrix(D) << std::endl;
 	
 }

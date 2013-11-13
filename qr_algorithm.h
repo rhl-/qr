@@ -13,8 +13,9 @@
 namespace ublas = boost::numeric::ublas;
 
 namespace t10 {
-	template< typename Matrix, typename String>
-	String print_matrix( const Matrix & M, String & str){
+	template< typename Matrix>
+	std::string print_matrix( const Matrix & M){
+		std::string str;
 		std::stringstream ss;
 		ss << M;
 		str = ss.str();
@@ -98,10 +99,6 @@ namespace t10 {
 		typedef typename ublas::diagonal_adaptor< Matrix> Diagonal_adapter;
 		typedef typename ublas::scalar_matrix< typename Matrix::value_type> Scalar;
 		typedef ublas::diagonal_adaptor< Scalar> Diagonal_scalar;
-		//Choose and apply shift
-		#ifdef DEBUG_QR_ITERATION
-		std::string sout;
-		#endif //DEBUG_QR_ITERATION
 		std::vector< typename Matrix::value_type> givens(n, 0.0); 
 		do{
 		#ifdef DEBUG_QR_ITERATION
@@ -116,16 +113,16 @@ namespace t10 {
 
 		for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i); }
 		#ifdef DEBUG_QR_ITERATION
-		std::cout << "Left Apply: H = " << print_matrix( H, sout) << std::endl;
+		std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
 		for (std::size_t i = 0; i < n-1; --i){ apply_givens_right(H,givens[n-(i+1)],i); }
 		#ifdef DEBUG_QR_ITERATION
-		std::cout << "Right Apply H = " << print_matrix( H, sout) << std::endl;
+		std::cout << "Right Apply H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
 		//Unshift
 		D += mu;
 		#ifdef DEBUG_QR_ITERATION
-		std::cout << "Shift: H = " << print_matrix( H, sout) << std::endl;
+		std::cout << "Shift: H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
 		} while( std::fabs(H(n-1,n-2)) > tol);
 	}
