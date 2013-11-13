@@ -27,7 +27,7 @@ int main( int argc, char * argv[]){
 	const double vector_test[3] = {3,2,1};
    	const double correct_house[3] = {1.00000000000000,-2.69666295470958,-1.34833147735479};
 	const double correct_beta =  0.198216274262727;
-
+	const double correct_eigs[3] = {14.6235, 1.0000, 4.3765};
 	//define matrix type (use boost)
 	//read input with boost program options
 	//boost supports specializations for banded, triangular, etc, see:
@@ -37,9 +37,11 @@ int main( int argc, char * argv[]){
 	Matrix A(n,n);
 	Vector V(n);
 	Vector CV(n);
+	Vector E(n);
 	for (unsigned int i = 0; i < M.size1(); ++i){
 		V(i) = vector_test[i];
 		CV(i) = correct_house[i];
+		E(i) = correct_eigs[i];
 		for(unsigned int j = 0; j < M.size2(); ++j){
 			M(i,j) = test_case[i][j];
 			A(i,j) = correct_hess[i][j];
@@ -61,5 +63,5 @@ int main( int argc, char * argv[]){
 	t10::qr_iteration(M);
 	Diagonal_adapter D(M);
 	std::cout << "D = " << t10::print_matrix(D) << std::endl;
-	
+	std::cout << "Correct Eigs: " << E << std::endl; 	
 }

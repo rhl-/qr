@@ -45,7 +45,7 @@ namespace t10 {
 			}
 			const Value tau = -b/a;
 			c = 1/ std::sqrt(1 + std::pow(tau, 2));
-			s = -tau * c;
+			s = tau * c;
 	}
 
 	template< typename T>
@@ -75,17 +75,18 @@ namespace t10 {
 			M(i,k) = c*ti - s*tj;
 			M(i+1,k) = s*ti + c*tj;
 		}
+		M(i+1,i) = 0;
 		return encode_givens(c,s);
 	}
 	template< typename Matrix>
 	void apply_givens_right( Matrix & M, const typename Matrix::value_type rho, const std::size_t i){
 		typename Matrix::value_type c=0.0,s=0.0;
 		decode_givens(rho, c,s);
-		for(std::size_t k = i; k < M.size1(); ++k){
-			const double ti = M(k,i);
-			const double tj = M(k,i+1);
-			M(k,i) = c*ti - s*tj;
-			M(k,i+1) = s*ti + c*tj;
+		for(std::size_t k = i-1; k < M.size1(); ++k){
+			const double ti = M(k,i-1);
+			const double tj = M(k,i);
+			M(k,i-1) = c*ti - s*tj;
+			M(k,i) = s*ti + c*tj;
 		}
 	}
 
@@ -110,12 +111,11 @@ namespace t10 {
 		D -= mu;
 		//TODO: Use tol to achieve deflation
 		
-
 		for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i); }
 		#ifdef DEBUG_QR_ITERATION
-		std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
+			std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
-		for (std::size_t i = 0; i < n-1; --i){ apply_givens_right(H,givens[n-(i+1)],i); }
+		for (std::size_t i = n-1; i > 0; --i){ apply_givens_right(H,givens[i],i); }
 		#ifdef DEBUG_QR_ITERATION
 		std::cout << "Right Apply H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
