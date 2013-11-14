@@ -122,16 +122,11 @@ namespace t10 {
 		const Diagonal_scalar mu( mu_s );
 		Diagonal_adapter D(H);
 		D -= mu;
-		for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i,i+1); 
-
-
-}
+		for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i,i+1); }
 		#ifdef DEBUG_QR_ITERATION
 		std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
-		for (std::size_t i = 0; i < n-1; ++i){ apply_givens_right(H,givens[i],i,i+1); 
-
-}
+		for (std::size_t i = 0; i < n-1; ++i){ apply_givens_right(H,givens[i],i,i+1); }
 		#ifdef DEBUG_QR_ITERATION
 		std::cout << "Right Apply H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
