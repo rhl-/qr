@@ -23,14 +23,22 @@ namespace t10 {
 		std::size_t rights = str.find(std::string("]"));
 		str.replace(lefts,rights-lefts+1,"");
 		std::size_t found = str.find(std::string("(("));
-		str.replace(found,2,std::string("\n("));
+		str.replace(found,2,std::string("["));
 		found = str.find(std::string("))"));
-		str.replace(found,2,std::string(")\n"));
+		str.replace(found,2,std::string("]"));
 		found = str.find(std::string("),"));
 		while( found != std::string::npos){
-			str.replace(found,2,std::string(")\n"));
+			str.replace(found,2,std::string(";"));
 			found = str.find(std::string("),"));
 		}
+
+		found = str.find(std::string("("));
+		while( found != std::string::npos){
+			str.replace(found,1,std::string(""));
+			found = str.find(std::string("("));
+		}
+
+
 		return str;	
 	}
 	//GVL Section 5.1.9
@@ -84,7 +92,7 @@ namespace t10 {
 				 const std::size_t i, const std::size_t k){
 		typename Matrix::value_type c=0.0,s=0.0;
 		decode_givens(rho, c,s);
-		for(std::size_t j = i; j < M.size1(); ++j){
+		for(std::size_t j = 0; j < M.size1(); ++j){
 			const double t1 = M(j,i);
 			const double t2 = M(j,k);
 			M(j,i) = c*t1 - s*t2;
@@ -107,17 +115,22 @@ namespace t10 {
 		do{
 		
 		#ifdef DEBUG_QR_ITERATION
+		std::cout << "---- Shift: " << H(n-1,n-1) << std::endl;
 		#endif //DEBUG_QR_ITERATION
 		Scalar mu_s(n,n,H(n-1,n-1));
-		std::cout << "---- (Shift: )" << H(n-1,n-1) << std::endl;
 		const Diagonal_scalar mu( mu_s );
 		Diagonal_adapter D(H);
 		D -= mu;
-		for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i,i+1); }
+		for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i,i+1); 
+
+
+}
 		#ifdef DEBUG_QR_ITERATION
 		std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
-		for (std::size_t i = 0; i < n-1; ++i){ apply_givens_right(H,givens[i],i,i+1); }
+		for (std::size_t i = 0; i < n-1; ++i){ apply_givens_right(H,givens[i],i,i+1); 
+
+}
 		#ifdef DEBUG_QR_ITERATION
 		std::cout << "Right Apply H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
@@ -127,7 +140,7 @@ namespace t10 {
 		std::cout << "Shift: H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
 		counter++;
-		} while( counter < 1000);
+		} while( counter < 100);
 		
 	}
 
