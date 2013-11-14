@@ -92,7 +92,8 @@ namespace t10 {
 				 const std::size_t i, const std::size_t k){
 		typename Matrix::value_type c=0.0,s=0.0;
 		decode_givens(rho, c,s);
-		for(std::size_t j = 0; j < M.size1(); ++j){
+		std::size_t max_iter = std::min(std::max(i,k)+1,M.size2());
+		for(std::size_t j = 0; j < max_iter; ++j){
 			const double t1 = M(j,i);
 			const double t2 = M(j,k);
 			M(j,i) = c*t1 - s*t2;
