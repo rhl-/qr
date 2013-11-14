@@ -1,6 +1,6 @@
 #ifndef QR_ALGORITHM_H
 #define QR_ALGORITHM_H
-#define DEBUG_QR_ITERATION //comment me out to turn off debug mode
+//#define DEBUG_QR_ITERATION //comment me out to turn off debug mode
 #include <boost/timer.hpp>
 #include <boost/numeric/ublas/banded.hpp> //for banded_adaptor
 #include <boost/numeric/ublas/matrix.hpp> //for slices
@@ -49,7 +49,7 @@ namespace t10 {
 	}
 
 	template< typename T>
-	int sign( const T & x){return (x < 0) ? -1 : (x > 0);}
+	int sign( const T & x){return (x < 0) ? -1 : 1;}
 	
 	template< typename Value>
 	Value encode_givens( const Value & c, const Value & s){
@@ -65,28 +65,30 @@ namespace t10 {
 	} 
 	
 	template< typename Matrix>
-	typename Matrix::value_type apply_givens_left( Matrix & M, const std::size_t i){
+	typename Matrix::value_type apply_givens_left( Matrix & M, 
+						       const std::size_t i, const std::size_t k){
 		typedef typename Matrix::value_type Value;
 		Value c=0.0, s=0.0;
-		compute_givens(M(i,i),M(i+1,i),c,s);
-		for(std::size_t k = i; k < M.size2(); ++k){
-			const double ti = M(i,k);
-			const double tj = M(i+1,k);
-			M(i,k) = c*ti - s*tj;
-			M(i+1,k) = s*ti + c*tj;
+		compute_givens(M(i,i),M(k,i),c,s);
+		for(std::size_t j = i; j < M.size2(); ++j){
+			const double ti = M(i,j);
+			const double tj = M(k,j);
+			M(i,j) = c*ti - s*tj;
+			M(k,j) = s*ti + c*tj;
 		}
-		M(i+1,i) = 0;
+		M(k,i) = 0;
 		return encode_givens(c,s);
 	}
 	template< typename Matrix>
-	void apply_givens_right( Matrix & M, const typename Matrix::value_type rho, const std::size_t i){
+	void apply_givens_right( Matrix & M, const typename Matrix::value_type rho, 
+				 const std::size_t i, const std::size_t k){
 		typename Matrix::value_type c=0.0,s=0.0;
 		decode_givens(rho, c,s);
-		for(std::size_t k = i-1; k < M.size1(); ++k){
-			const double ti = M(k,i-1);
-			const double tj = M(k,i);
-			M(k,i-1) = c*ti - s*tj;
-			M(k,i) = s*ti + c*tj;
+		for(std::size_t j = i; j < M.size1(); ++j){
+			const double t1 = M(j,i);
+			const double t2 = M(j,k);
+			M(j,i) = c*t1 - s*t2;
+			M(j,k) = s*t1 + c*t2;
 		}
 	}
 
@@ -100,22 +102,22 @@ namespace t10 {
 		typedef typename ublas::diagonal_adaptor< Matrix> Diagonal_adapter;
 		typedef typename ublas::scalar_matrix< typename Matrix::value_type> Scalar;
 		typedef ublas::diagonal_adaptor< Scalar> Diagonal_scalar;
-		std::vector< typename Matrix::value_type> givens(n, 0.0); 
+		std::vector< typename Matrix::value_type> givens(n-1, 0.0); 
+		int counter=0;
 		do{
+		
 		#ifdef DEBUG_QR_ITERATION
-		std::cout << "----" << std::endl;
 		#endif //DEBUG_QR_ITERATION
 		Scalar mu_s(n,n,H(n-1,n-1));
+		std::cout << "---- (Shift: )" << H(n-1,n-1) << std::endl;
 		const Diagonal_scalar mu( mu_s );
 		Diagonal_adapter D(H);
 		D -= mu;
-		//TODO: Use tol to achieve deflation
-		
-		for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i); }
+		for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i,i+1); }
 		#ifdef DEBUG_QR_ITERATION
-			std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
+		std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
-		for (std::size_t i = n-1; i > 0; --i){ apply_givens_right(H,givens[i],i); }
+		for (std::size_t i = 0; i < n-1; ++i){ apply_givens_right(H,givens[i],i,i+1); }
 		#ifdef DEBUG_QR_ITERATION
 		std::cout << "Right Apply H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
@@ -124,7 +126,9 @@ namespace t10 {
 		#ifdef DEBUG_QR_ITERATION
 		std::cout << "Shift: H = " << print_matrix( H) << std::endl;
 		#endif //DEBUG_QR_ITERATION
-		} while( std::fabs(H(n-1,n-2)) > tol);
+		counter++;
+		} while( counter < 1000);
+		
 	}
 
 	template< typename Vector>
