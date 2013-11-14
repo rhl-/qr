@@ -102,8 +102,6 @@ namespace t10 {
 	}
 
 	//TODO: Specialize for symmetric matrices
-	template< typename Matrix, typename Matrix_list>
-	void qr_iteration( Matrix & H, Matrix_list & Q){}
 	
 	template< typename Matrix>
 	void qr_iteration( Matrix & H, double tol=1e-16){
@@ -178,8 +176,6 @@ namespace t10 {
 		}
 	}
 
-	template< typename Matrix, typename Matrix_list>
-	void hessenberg( Matrix & M, Matrix_list & Q){}
 	
 	template< typename Matrix>
 	void hessenberg( Matrix & M){
@@ -206,26 +202,30 @@ namespace t10 {
 
 	template< typename Matrix>
 	void qr( Matrix & M){
-		//handle edge cases gracefully.
-		if (M.size1() <= 2){return;}
-			//TODO: compute answer instantly;
-
-		hessenberg(M);
-		qr_iteration( M);
+		switch(M.size1()) {
+		case 0:
+			std::cout << "case0" << std::endl;
+		case 1:
+			std::cout << "case1" << std::endl;
+			break;
+		case 2:
+			std::cout << "case2" << std::endl;
+			typedef typename Matrix::value_type Value;
+			const Value a = M(0,0)+M(1,1);
+			const Value b = std::sqrt(4*M(1,0)*M(0,1) + std::pow((M(0,0)-M(1,1)),2));
+			M(0,0) = (a + b)/2;
+			M(1,1) = (a - b)/2;
+			M(1,0) = 0;
+			M(0,1) = 0;
+			break;
+		default:
+			std::cout << "default" << std::endl;
+			hessenberg(M);
+			qr_iteration( M);
+			
 		//TODO: extract D
+		}
 	}
 
-	template< typename Matrix>
-	void qr( Matrix & M, Matrix & V){
-		//handle edge cases gracefully.
-		if (M.size1() <= 2){
-			//TODO: compute answer instantly;
-			return;
-		}
-		std::vector< Matrix> Q; 
-		hessenberg(M, Q);
-		qr_iteration( M, Q);
-		//TODO: compute V
-	}
 } //end namespace t10
 #endif //QR_ALGORITHM_H
