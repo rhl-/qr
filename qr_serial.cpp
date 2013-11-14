@@ -19,25 +19,16 @@ int main( int argc, char * argv[]){
 	{8,7,4},
 	{4,3,8}};
 	Matrix M0(0,0);
-	std::cout << "Here!" << std::endl;
 	Matrix M1(1,1);
 	M1(0,0) = 42;
-	std::cout << "Here11!" << std::endl;
 	Matrix M2(2,2);
 	M2(0,0) = 42;  
 	M2(0,1) = 24; 
 	M2(1,0) = 69; 
 	M2(1,1) = 12;
-	std::cout << "Here22!" << std::endl;
-	//t10::qr_iteration(M0);
-	std::cout << "heh" << std::endl;
-	//std::cout << "M0 = " << t10::print_matrix(M0) << std::endl;
-	std::cout << "Here33!" << std::endl;
-	t10::qr_iteration(M1);
-	std::cout << "M1 = " << t10::print_matrix(M1) << std::endl;
-	t10::qr_iteration(M2);
-	std::cout << "M2 = " << t10::print_matrix(M2) << std::endl;
-
+	t10::qr(M1);
+	t10::qr(M2);
+	std::cout << t10::print_matrix(M1) << std::endl << t10::print_matrix(M2) << std::endl;
 	const double correct_hess[3][3] = 
   	{{ 5.000000000000000,   -4.024922359499620,    1.341640786499874},
    	 {-8.944271909999159,   10.000000000000000,   -3.000000000000000},
