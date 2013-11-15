@@ -1,9 +1,9 @@
 
 #include <iostream>
-#include "qr_algorithm.h"
+#include "qr_algorithm_serial.h"
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/io.hpp>
-#include<algorithm>
+#include <algorithm>
 #include <boost/numeric/ublas/banded.hpp> //for banded_adaptor
 
 namespace ublas = boost::numeric::ublas;
