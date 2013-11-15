@@ -44,6 +44,7 @@ int main( int argc, char * argv[]){
 	//http://www.boost.org/doc/libs/1_54_0/libs/numeric/ublas/doc/index.htm
 	const std::size_t n = 3;
 	Matrix M(n,n);
+	Matrix HM(n,n);
 	Matrix A(n,n);
 	Vector V(n);
 	Vector CV(n);
@@ -57,7 +58,7 @@ int main( int argc, char * argv[]){
 			A(i,j) = correct_hess[i][j];
 		}
 	}
-	
+	HM = M;
 	//Householder Vector Test
 	std::cout << "Input: " << V << std::endl;
 	t10::compute_householder_vector(V);
@@ -66,11 +67,11 @@ int main( int argc, char * argv[]){
 	std::cout << "V: " << V << " correct V: " << CV << std::endl;
 	std::cout << " ------------------------------------------------- " << std::endl;	
 	//Hessenberg Reduction Test
-	std::cout << "Input Matrix: " << t10::print_matrix(M)<< std::endl;
-	t10::hessenberg(M);
-	std::cout << "M = " << t10::print_matrix(M) << std::endl;
+	std::cout << "Input Matrix: " << t10::print_matrix(HM)<< std::endl;
+	t10::hessenberg(HM);
+	std::cout << "M = " << t10::print_matrix(HM) << std::endl;
 	std::cout << "A = " << t10::print_matrix(A) << std::endl;
-	t10::qr_iteration(M);
+	t10::qr(M);
 	Diagonal_adapter D(M);
 	std::cout << "D = " << t10::print_matrix(D) << std::endl;
 	std::cout << "Correct Eigs: " << E << std::endl; 	

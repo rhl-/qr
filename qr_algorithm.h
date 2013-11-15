@@ -1,6 +1,8 @@
 #ifndef QR_ALGORITHM_H
 #define QR_ALGORITHM_H
+#define QR_ITERATION_OUTPUT
 //#define DEBUG_QR_ITERATION //comment me out to turn off debug mode
+#include <iomanip>
 #include <boost/timer.hpp>
 #include <boost/numeric/ublas/banded.hpp> //for banded_adaptor
 #include <boost/numeric/ublas/matrix.hpp> //for slices
@@ -14,7 +16,51 @@ namespace ublas = boost::numeric::ublas;
 
 namespace t10 {
 	template< typename Matrix>
-	std::string print_matrix( const Matrix & M){
+	std::string print_matrix( const Matrix & M, std::size_t p=7){
+		std::string str;
+		std::stringstream ss;
+		ss.setf( std::ios::fixed, std:: ios::floatfield );
+		ss << std::setw( p) << std::setprecision( p) <<  M;
+		str = ss.str();
+		//kill size thing
+		std::size_t lefts = str.find(std::string("["));
+		std::size_t rights = str.find(std::string("]"));
+		str.replace(lefts,rights-lefts+1,"");
+		
+		//start with new line	
+		std::size_t found = str.find(std::string("(("));
+		str.replace(found,2,std::string("\n"));
+		//end with new line
+		found = str.find(std::string("))"));
+		str.replace(found,2,std::string("\n"));
+	
+		//end of each row
+		found = str.find(std::string("),"));
+		while( found != std::string::npos){
+			str.replace(found,2,std::string("\n"));
+			found = str.find(std::string("),"));
+		}
+		//remove beginning of row
+		found = str.find(std::string("("));
+		while( found != std::string::npos){
+			str.replace(found,1,std::string(""));
+			found = str.find(std::string("("));
+		}
+		//replace , with tab
+		found = str.find(std::string(","));
+		while( found != std::string::npos){
+			str.replace(found,1,std::string("\t"));
+			found = str.find(std::string(","));
+		}
+		
+		return str;
+	}
+
+
+
+	
+	template< typename Matrix>
+	std::string print_matrix( const Matrix & M, bool matlab){
 		std::string str;
 		std::stringstream ss;
 		ss << M;
@@ -105,36 +151,47 @@ namespace t10 {
 	
 	template< typename Matrix>
 	void qr_iteration( Matrix & H, double tol=1e-16){
+		#ifdef QR_ITERATION_OUTPUT
+		std::cout << "H = " << print_matrix( H) << std::endl;
+		#endif	
 		std::size_t n = H.size1();
+		typedef typename Matrix::value_type Value;
 		typedef typename ublas::diagonal_adaptor< Matrix> Diagonal_adapter;
-		typedef typename ublas::scalar_matrix< typename Matrix::value_type> Scalar;
+		typedef typename ublas::scalar_matrix< Value> Scalar;
 		typedef ublas::diagonal_adaptor< Scalar> Diagonal_scalar;
 		std::vector< typename Matrix::value_type> givens(n-1, 0.0); 
-		int counter=0;
 		do{
-		
-		#ifdef DEBUG_QR_ITERATION
-		std::cout << "---- Shift: " << H(n-1,n-1) << std::endl;
-		#endif //DEBUG_QR_ITERATION
-		Scalar mu_s(n,n,H(n-1,n-1));
-		const Diagonal_scalar mu( mu_s );
-		Diagonal_adapter D(H);
-		D -= mu;
-		for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i,i+1); }
-		#ifdef DEBUG_QR_ITERATION
-		std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
-		#endif //DEBUG_QR_ITERATION
-		for (std::size_t i = 0; i < n-1; ++i){ apply_givens_right(H,givens[i],i,i+1); }
-		#ifdef DEBUG_QR_ITERATION
-		std::cout << "Right Apply H = " << print_matrix( H) << std::endl;
-		#endif //DEBUG_QR_ITERATION
-		//Unshift
-		D += mu;
-		#ifdef DEBUG_QR_ITERATION
-		std::cout << "Shift: H = " << print_matrix( H) << std::endl;
-		#endif //DEBUG_QR_ITERATION
-		counter++;
-		} while( counter < 100);
+			const Value a = H(n-2,n-2)+H(n-1,n-1);
+			const Value b = std::sqrt(4*H(n-1,n-2)*H(n-2,n-1) + std::pow((H(n-2,n-2)-H(n-1,n-1)),2));
+			const Value e1 = (a+b)/2, e2 = (a-b)/2;
+			const Value shift = (std::fabs(e1- H(n-1,n-1)) < std::fabs(e2 - H(n-1,n-1)))? e1 : e2;
+			
+			Scalar mu_s(n,n,shift);
+			const Diagonal_scalar mu( mu_s );
+			Diagonal_adapter D(H);
+			D -= mu;
+			for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i,i+1); }
+			
+			#ifdef DEBUG_QR_ITERATION
+				std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
+			#endif //DEBUG_QR_ITERATION
+			
+			for (std::size_t i = 0; i < n-1; ++i){ apply_givens_right(H,givens[i],i,i+1); }
+			
+			#ifdef DEBUG_QR_ITERATION
+				std::cout << "Right Apply H = " << print_matrix( H) << std::endl;
+			#endif //DEBUG_QR_ITERATION
+			
+			//Unshift
+			D += mu;
+			
+			#ifdef QR_ITERATION_OUTPUT
+			std::cout.precision( 7);
+			std::cout.setf( std::ios::fixed, std:: ios::floatfield );
+			std::cout << "---- Shift: " << std::setw( 10) << shift  << std::endl;
+			std::cout << "---- Error: " << std::setw( 10)  << std::fabs(H(n-1,n-2)) << std::endl;
+			#endif //DEBUG_QR_ITERATION
+		} while( std::fabs(H(n-1,n-2)) > tol);
 		
 	}
 
@@ -208,16 +265,23 @@ namespace t10 {
 		case 1:
 			return;
 		case 2:
+			{
 			const Value a = M(0,0)+M(1,1);
 			const Value b = std::sqrt(4*M(1,0)*M(0,1) + std::pow((M(0,0)-M(1,1)),2));
 			M(0,0) = (a + b)/2;
 			M(1,1) = (a - b)/2;
 			M(1,0) = 0;
 			M(0,1) = 0;
+			}	
 			return;
 		default:
+			typedef typename ublas::matrix_range<Matrix> Matrix_range;
+			typedef typename ublas::range Range;
 			hessenberg(M);
-			qr_iteration( M);
+			for (std::size_t i = M.size1(); i > 1; --i){
+				Matrix_range R(M, Range (0, i), Range (0, i));
+				qr_iteration( R);
+			}
 		}
 	}
 
