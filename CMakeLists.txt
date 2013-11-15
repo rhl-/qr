@@ -18,6 +18,8 @@ ${Boost_INCLUDE_PATH}
 )
 
 link_directories (${MPI_LIBRARIES})
-add_executable(qr qr_serial.cpp)
+add_executable(qrs qr_serial.cpp)
+add_executable(qrp qr_distributed.cpp)
 
-target_link_libraries(qr ${MPI_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(qrs ${MPI_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(qrp ${MPI_LIBRARIES} ${Boost_LIBRARIES})
