@@ -20,6 +20,7 @@
 
 namespace ublas = boost::numeric::ublas;
 namespace po = boost::program_options;
+namespace mpi = boost::mpi;
 
 typedef ublas::vector< double > Vector;
 typedef ublas::matrix< double> Matrix;
