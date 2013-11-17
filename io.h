@@ -15,29 +15,56 @@
 namespace ublas = boost::numeric::ublas;
 namespace po = boost::program_options;
 namespace t10 {
+	//TODO: Delimiter should be passed into program as an option 
 	template< typename Stream, typename Matrix, typename Communicator>
-	bool read_csv( Stream & in, Matrix & M, const Communicator & World){
-		const std::size_t proc_id = world.rank();
-		const std::size_t num_proc = world.size();
-		int N = 0;
-		//Make sure to go top down.
-		while(std::getline(ifs,line,',')) {
-			std::stringstream lineStream(line);
-			std::string token;
-			while(lineStream >> token) { N++; }
-		}
-			int n = std::sqrt(N);
-			if (N > n*n) {
-				std::cout << "File has a non-square matrix" << std::endl;
-				return;
+	bool read_csv( Stream & in, Matrix & M, const Communicator & World, char delimiter=','){
+		std::string line;
+
+		//Step 0: Get first line
+		std::getline(in, line);
+		std::size_t number_of_rows=1;
+		const std::size_t number_of_columns=std::count(line.begin(), line.end(), delimiter)+1;
+
+		//Step 1: Determine the number of lines in the file
+		//Also verify that it is well formatted.
+		while (std::getline(in, line)){
+			if(number_of_columns!=std::count(line.begin(), line.end(), delimiter)+1){
+				std::cerr << "CSV File is invalid" << std::endl;
+				return false;
 			}
+			++number_of_rows;
+		}
+		if (number_of_rows != number_of_columns){
+			std::cerr << "Matrix is not square" << std::endl;
+			return false;
+		}
+		//Step 2:
+		//TODO: set variables like these 
+		//use world.size() and world.rank()
+		//const std::size_t first_row=;
+		//const std::size_t last_row=;
+		//const std::size_t firt_col=;
+		//const std::size_t last_col=;
+		//TODO: Allocate the output
+		//M.resize( _____, _____);
+
+		//Step 3: Read The File!
+		//Go to Beginning...
+		in.seekg(std::ios::beg);
+		//... then go to the first_row line
+		for(std::size_t i =0; i < first_row-1; ++i) { in.ignore(std::numeric_limits<std::streamsize>::max(),'\n'); }
+		for(std::size_t i =0; i < last_row-first_row; ++i){
+			std::getline(in, line);
+			//TODO: use a std::stringstream (for example) to tokenize the line
+			//iterate over tokenized string and cast then insert results into M[i,j]
+		}
 		return true;
 	}
+
 	template< typename Stream, typename Matrix, typename Communicator>
 	bool read_mm( Stream & in, Matrix & M, const Communicator & World){
-		const std::size_t proc_id = world.rank();
-		const std::size_t num_proc = world.size();
-		return true;
+		std::cerr << "Not Yet Implemented Yet" << std::endl;
+		return false;
 	}
 	
 	template< typename String, typename Matrix, typename Communicator>
@@ -63,12 +90,12 @@ namespace t10 {
 		}
 		//TODO: Error checking if file doesn't open.
 		if (file_ext == "csv") {
-			if (!read_csv( ifs, M, world)){
+			if (!read_csv( in, M, world)){
 				std::cerr << "Error Reading CSV file" << std::endl;
 				std::exit( -1);
 			}
 		} else if (file_ext == "mm") {
-			if (!read_mm( ifs, M, world)){
+			if (!read_mm( in, M, world)){
 				std::cerr << "Error Reading Matrix Market file" << std::endl;
 				std::exit( -1);
 			}
@@ -76,34 +103,6 @@ namespace t10 {
 			std::cerr << "File Format Not Supported" << std::endl;
 			std::exit( -1);
 		}
-		/*
-		//Get file extension
-		std::string line;
-		if (fileext == "csv") {
-			int N = 0;
-			 while(std::getline(ifs,line,',')) {
-				std::stringstream lineStream(line);
-				std::string token;
-				while(lineStream >> token) {
-					N++;
-				}
-			}
-			int n = std::sqrt(N);
-			if (N > n*n) {
-				std::cout << "File has a non-square matrix" << std::endl;
-				return;
-			}
-		}	
-		else if (fileext == "mm") return;
-			// matrix market format
-		
-		//out of world.size() total processors	
-		//initially M is not the appropriate size
-		// 1. open the file in filename
-		// 2. we need to be able to know the matrix size in advance, say it is n x n
-		// 3. M.resize(block_size(n),block_size(n))  
-		// 4. read in data into M
-		*/
 	}
 	template<typename Variable_map>
 	void process_args( int & argc, char *argv[],Variable_map & vm){
