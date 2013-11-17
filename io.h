@@ -52,12 +52,12 @@ namespace t10 {
 		//Go to Beginning...
 		in.seekg(std::ios::beg);
 		//... then go to the first_row line
-		for(std::size_t i =0; i < first_row-1; ++i) { in.ignore(std::numeric_limits<std::streamsize>::max(),'\n'); }
-		for(std::size_t i =0; i < last_row-first_row; ++i){
-			std::getline(in, line);
+		//for(std::size_t i =0; i < first_row-1; ++i) { in.ignore(std::numeric_limits<std::streamsize>::max(),'\n'); }
+		//for(std::size_t i =0; i < last_row-first_row; ++i){
+		//	std::getline(in, line);
 			//TODO: use a std::stringstream (for example) to tokenize the line
 			//iterate over tokenized string and cast then insert results into M[i,j]
-		}
+		//}
 		return true;
 	}
 
