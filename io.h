@@ -1,12 +1,47 @@
 #include <boost/numeric/ublas/io.hpp> //io
 #include <iomanip>
 #include <sstream>
+#include <iostream>
+#include <string>
+#include <fstream>
+
+//BOOST MPI
+#include <boost/mpi/environment.hpp>
+#include <boost/mpi/communicator.hpp>
+
+//BOOST PROGRAM OPTIONS
+#include <boost/program_options.hpp>
+
 namespace ublas = boost::numeric::ublas;
+namespace po = boost::program_options;
 namespace t10 {
 	template< typename String, typename Matrix, typename Communicator>
 	void read_matrix( const String & filename, Matrix & M, const Communicator & world){
-		//TODO: Implement reading
-		//world.rank() is the processors # 
+		int proc_id = world.rank();
+		int num_proc = world.size();
+		std::ifstream ifs;
+		ifs.open(filename.c_str());
+		//Get file extension
+		std::string fileext(filename.substr(filename.find_last_of(".") + 1));
+		std::string line;
+		if (fileext == "csv") {
+			int N = 0;
+			 while(std::getline(ifs,line,',')) {
+				std::stringstream lineStream(line);
+				std::string token;
+				while(lineStream >> token) {
+					N++;
+				}
+			}
+			int n = std::sqrt(N);
+			if (N > n*n) {
+				std::cout << "File has a non-square matrix" << std::endl;
+				return;
+			}
+		}	
+		else if (fileext == "mm") return;
+			// matrix market format
+		
 		//out of world.size() total processors	
 		//initially M is not the appropriate size
 		// 1. open the file in filename
