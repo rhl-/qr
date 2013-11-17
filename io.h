@@ -15,14 +15,69 @@
 namespace ublas = boost::numeric::ublas;
 namespace po = boost::program_options;
 namespace t10 {
+	template< typename Stream, typename Matrix, typename Communicator>
+	bool read_csv( Stream & in, Matrix & M, const Communicator & World){
+		const std::size_t proc_id = world.rank();
+		const std::size_t num_proc = world.size();
+		int N = 0;
+		//Make sure to go top down.
+		while(std::getline(ifs,line,',')) {
+			std::stringstream lineStream(line);
+			std::string token;
+			while(lineStream >> token) { N++; }
+		}
+			int n = std::sqrt(N);
+			if (N > n*n) {
+				std::cout << "File has a non-square matrix" << std::endl;
+				return;
+			}
+		return true;
+	}
+	template< typename Stream, typename Matrix, typename Communicator>
+	bool read_mm( Stream & in, Matrix & M, const Communicator & World){
+		const std::size_t proc_id = world.rank();
+		const std::size_t num_proc = world.size();
+		return true;
+	}
+	
 	template< typename String, typename Matrix, typename Communicator>
 	void read_matrix( const String & filename, Matrix & M, const Communicator & world){
-		int proc_id = world.rank();
-		int num_proc = world.size();
-		std::ifstream ifs;
-		ifs.open(filename.c_str());
+		//0. open file (std::istream)
+		//1. determine file type
+			//a) determined by extension
+			//b) valid extensions
+				//csv
+				//matrixmarket
+		//2. determine matrix size k
+			//take N # of rows in original matrix, divide by sqrt( num_processors)
+		//3. allocate output memory i.e. k x k matrix
+				//M.resize(k,k)
+		//4. read appropriate part of input into output
+				//seek to place in file and read elt by elt
+
+		const std::string file_ext(filename.substr(filename.find_last_of(".") + 1));
+		std::ifstream in(filename.c_str());
+		if (!in.good()){ 
+			std::cerr << "Error Opening " << filename  << std::endl;
+			std::exit( -1);
+		}
+		//TODO: Error checking if file doesn't open.
+		if (file_ext == "csv") {
+			if (!read_csv( ifs, M, world)){
+				std::cerr << "Error Reading CSV file" << std::endl;
+				std::exit( -1);
+			}
+		} else if (file_ext == "mm") {
+			if (!read_mm( ifs, M, world)){
+				std::cerr << "Error Reading Matrix Market file" << std::endl;
+				std::exit( -1);
+			}
+		} else {
+			std::cerr << "File Format Not Supported" << std::endl;
+			std::exit( -1);
+		}
+		/*
 		//Get file extension
-		std::string fileext(filename.substr(filename.find_last_of(".") + 1));
 		std::string line;
 		if (fileext == "csv") {
 			int N = 0;
@@ -48,6 +103,7 @@ namespace t10 {
 		// 2. we need to be able to know the matrix size in advance, say it is n x n
 		// 3. M.resize(block_size(n),block_size(n))  
 		// 4. read in data into M
+		*/
 	}
 	template<typename Variable_map>
 	void process_args( int & argc, char *argv[],Variable_map & vm){
