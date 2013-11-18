@@ -41,34 +41,50 @@ namespace t10 {
 		//matrix is well formatted, now get the size of the blocks for each processor
 		//1. calculate equally sized block sizes and remaining entries
 		const std::size_t num_proc = world.size();
+		// for now ignore the fact that number of processors is not perfect square
 		const std::size_t p = std::sqrt(world.size());
+		// assume proc id is 0 indexed
 		const std::size_t proc_id = world.rank();
-		std::size_t block_size = number_of_rows/p;
+		const std::size_t avg_block_size = number_of_rows/p;
+		std::size_t block_size = avg_block_size;
 		const std::size_t remaining = number_of_rows % p;
-		//2. based on number of remaining entries and proc ID determine if block size needs to be increased by one
-		//determine the starting line and starting column index
-		//1. depending on the processor ID and number of left over entries
-		//together with starting row and column and block size
-		//1. size the matrix M this way
-		//2. input entries into M
-		
-		//Step 2:
-		//TODO: set variables like these 
-		//use world.size() and world.rank()
-		//const std::size_t first_row=;
-		//const std::size_t last_row=;
-		//const std::size_t firt_col=;
-		//const std::size_t last_col=;
-		//TODO: Allocate the output
-		//M.resize( _____, _____);
+		// row and column index of the block for this processor, from 0 to p-1, this is invariant
+		const std::size_t block_row = proc_id / p;
+		const std::size_t block_col = proc_id % p;
+		// if remaining was > 0, this block size increases by 1 if the block is within the first remaining x remaining 
+		// blocks, as we distribute remaining entries among the first submatrix of blocks
+		if (block_row < remaining && block_col < remaining) {
+			++block_size;
+		}
+		// number of lines to skip to get to this block, sum of the block sizes of the blocks "above" it
+		// add the lesser of remaining number of elements and block_row index, because that many remaining elements
+		// have been distributed to the blocks "above" it
+		const std::size_t first_row = block_row * avg_block_size + std::min(remaining, block_row);
+		// similarly for columns
+		const std::size_t first_col = block_col * avg_block_size + std::min(remaining, block_col);
+		// now set the matrix size
+		M.resize(block_size, block_size);
 
 		//Step 3: Read The File!
 		//Go to Beginning...
 		in.seekg(std::ios::beg);
 		//... then go to the first_row line
-		//for(std::size_t i =0; i < first_row-1; ++i) { in.ignore(std::numeric_limits<std::streamsize>::max(),'\n'); }
-		//for(std::size_t i =0; i < last_row-first_row; ++i){
-		//	std::getline(in, line);
+		for(std::size_t i =0; i < first_row-1; ++i) { in.ignore(std::numeric_limits<std::streamsize>::max(),'\n'); }
+		std::size_t j;
+		for(std::size_t i =0; i < block_size; ++i){
+			std::getline(in, line, delimiter);
+			std::stringstream lineStream(line);
+			std::string token;
+			j = 0;
+			while (j < first_col && lineStream >> token) {
+				++j;
+			}
+			j = 0;
+			while (j < block_size && lineStream >> token) {
+				M(i,j) = atof(token.c_str());
+				++j;
+			}
+		}				
 			//TODO: use a std::stringstream (for example) to tokenize the line
 			//iterate over tokenized string and cast then insert results into M[i,j]
 		//}
@@ -80,7 +96,6 @@ namespace t10 {
 		std::cerr << "Not Yet Implemented Yet" << std::endl;
 		return false;
 	}
-	
 	template< typename String, typename Matrix, typename Communicator>
 	void read_matrix( const String & filename, Matrix & M, const Communicator & world){
 		//0. open file (std::istream)
