@@ -56,6 +56,7 @@ namespace t10 {
 		if (block_row < remaining && block_col < remaining) {
 			++block_size;
 		}
+		block_size += block_row < remaining && block_col < remaining;
 		// number of lines to skip to get to this block, sum of the block sizes of the blocks "above" it
 		// add the lesser of remaining number of elements and block_row index, because that many remaining elements
 		// have been distributed to the blocks "above" it
@@ -85,9 +86,6 @@ namespace t10 {
 				++j;
 			}
 		}				
-			//TODO: use a std::stringstream (for example) to tokenize the line
-			//iterate over tokenized string and cast then insert results into M[i,j]
-		//}
 		return true;
 	}
 
