@@ -17,7 +17,7 @@ namespace po = boost::program_options;
 namespace t10 {
 	//TODO: Delimiter should be passed into program as an option 
 	template< typename Stream, typename Matrix, typename Communicator>
-	bool read_csv( Stream & in, Matrix & M, const Communicator & World, char delimiter=','){
+	bool read_csv( Stream & in, Matrix & M, const Communicator & world, char delimiter=','){
 		std::string line;
 
 		//Step 0: Get first line
@@ -38,6 +38,20 @@ namespace t10 {
 			std::cerr << "Matrix is not square" << std::endl;
 			return false;
 		}
+		//matrix is well formatted, now get the size of the blocks for each processor
+		//1. calculate equally sized block sizes and remaining entries
+		const std::size_t num_proc = world.size();
+		const std::size_t p = std::sqrt(world.size());
+		const std::size_t proc_id = world.rank();
+		std::size_t block_size = number_of_rows/p;
+		const std::size_t remaining = number_of_rows % p;
+		//2. based on number of remaining entries and proc ID determine if block size needs to be increased by one
+		//determine the starting line and starting column index
+		//1. depending on the processor ID and number of left over entries
+		//together with starting row and column and block size
+		//1. size the matrix M this way
+		//2. input entries into M
+		
 		//Step 2:
 		//TODO: set variables like these 
 		//use world.size() and world.rank()
