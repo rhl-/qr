@@ -94,6 +94,11 @@ namespace t10 {
 		std::cerr << "Not Yet Implemented Yet" << std::endl;
 		return false;
 	}
+	template< typename Stream, typename Matrix, typename Communicator>
+	bool read_mat( Stream & in, Matrix & M, const Communicator & World){
+		std::cerr << "Not Yet Implemented Yet" << std::endl;
+		return false;
+	}
 	template< typename String, typename Matrix, typename Communicator>
 	void read_matrix( const String & filename, Matrix & M, const Communicator & world){
 		//0. open file (std::istream)
@@ -124,6 +129,11 @@ namespace t10 {
 		} else if (file_ext == "mm") {
 			if (!read_mm( in, M, world)){
 				std::cerr << "Error Reading Matrix Market file" << std::endl;
+				std::exit( -1);
+			}
+		} else if (file_ext == "mat") {
+			if (!read_mat( in, M, world)){
+				std::cerr << "Error Reading .Mat file" << std::endl;
 				std::exit( -1);
 			}
 		} else {
