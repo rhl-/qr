@@ -38,5 +38,6 @@ int main( int argc, char * argv[]){
 	std::string filename( vm[ "input-file"].as< std::string>());
 	Matrix M;
 	t10::read_matrix( filename, M, world);
+	std::cout << t10::print_matrix( M) << std::endl;
 //	t10::qr(M, world);
 }

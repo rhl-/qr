@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include "mmio.h"
 
 //BOOST MPI
 #include <boost/mpi/environment.hpp>
@@ -41,51 +42,61 @@ namespace t10 {
 		//matrix is well formatted, now get the size of the blocks for each processor
 		//1. calculate equally sized block sizes and remaining entries
 		const std::size_t num_proc = world.size();
+		std::cout << "num_proc" << num_proc << std::endl;
 		// for now ignore the fact that number of processors is not perfect square
 		const std::size_t p = std::sqrt(world.size());
+		std::cout << "p" << p << std::endl;
 		// assume proc id is 0 indexed
 		const std::size_t proc_id = world.rank();
+		std::cout << "proc_id" << proc_id << std::endl;
 		const std::size_t avg_block_size = number_of_rows/p;
+		std::cout << "avg" << avg_block_size << std::endl;
 		std::size_t block_size = avg_block_size;
+		std::cout << "block_size" << block_size << std::endl;
 		const std::size_t remaining = number_of_rows % p;
+		std::cout << "rem" << remaining << std::endl;
 		// row and column index of the block for this processor, from 0 to p-1, this is invariant
 		const std::size_t block_row = proc_id / p;
+		std::cout << "block_row" << block_row << std::endl;
 		const std::size_t block_col = proc_id % p;
+		std::cout << "col" << block_col << std::endl;
 		// if remaining was > 0, this block size increases by 1 if the block is within the first remaining x remaining 
 		// blocks, as we distribute remaining entries among the first submatrix of blocks
 		if (block_row < remaining && block_col < remaining) {
 			++block_size;
 		}
 		block_size += block_row < remaining && block_col < remaining;
+		std::cout << "new block size" << block_size << std::endl;
 		// number of lines to skip to get to this block, sum of the block sizes of the blocks "above" it
 		// add the lesser of remaining number of elements and block_row index, because that many remaining elements
 		// have been distributed to the blocks "above" it
 		const std::size_t first_row = block_row * avg_block_size + std::min(remaining, block_row);
+		std::cout << "first row" << first_row << std::endl;
 		// similarly for columns
 		const std::size_t first_col = block_col * avg_block_size + std::min(remaining, block_col);
+		std::cout << "first col" << first_col << std::endl;
 		// now set the matrix size
 		M.resize(block_size, block_size);
 
+		in.clear();
+		in.seekg(0, std::ios::beg);
 		//Step 3: Read The File!
 		//Go to Beginning...
-		in.seekg(std::ios::beg);
 		//... then go to the first_row line
-		for(std::size_t i =0; i < first_row-1; ++i) { in.ignore(std::numeric_limits<std::streamsize>::max(),'\n'); }
-		std::size_t j;
+		for(std::size_t i =1; i < first_row; ++i) { std::getline(in, line); }
 		for(std::size_t i =0; i < block_size; ++i){
-			std::getline(in, line, delimiter);
-			std::stringstream lineStream(line);
-			std::string token;
-			j = 0;
-			while (j < first_col && lineStream >> token) {
-				++j;
+			std::getline(in, line);
+			std::cout << "line: " << line << std::endl;
+			for (std::size_t j = 1; j < first_col; ++j){ 
+				const std::size_t found = line.find_first_of(",");
 			}
-			j = 0;
-			while (j < block_size && lineStream >> token) {
-				M(i,j) = atof(token.c_str());
-				++j;
+			for( std::size_t j = 0; j < block_size; ++j){
+				const std::size_t found = line.find_first_of(",");
+				M(i,j) = atof( line.substr(0, found).c_str());
+				line = line.substr( found+1);
+//				std::cout << j << " " <<  M(i,j) << std::endl;
 			}
-		}				
+		}
 		return true;
 	}
 
