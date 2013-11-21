@@ -1,3 +1,5 @@
+#ifndef T10_IO_H
+#define T10_IO_H
 #include <boost/numeric/ublas/io.hpp> //io
 #include <iomanip>
 #include <sstream>
@@ -16,9 +18,21 @@
 namespace ublas = boost::numeric::ublas;
 namespace po = boost::program_options;
 namespace t10 {
+	
+        std::pair<std::size_t, std::size_t> id_to_index(const std::size_t & proc_id, const std::size_t & p) {
+                return std::make_pair(proc_id / p, proc_id % p);
+        }
+
+        std::size_t index_to_id(const std::size_t & block_row, const std::size_t & block_col, const std::size_t & p) {
+                return block_row * p + block_col;
+        }
 	//TODO: Delimiter should be passed into program as an option 
-	template< typename Stream, typename Matrix, typename Communicator>
-	bool read_csv( Stream & in, Matrix & M, const Communicator & world, char delimiter=','){
+	template< typename Stream, typename Matrix_data, typename Communicator>
+	bool read_csv( Stream & in, Matrix_data & data, const Communicator & world, char delimiter=','){
+		typedef typename Matrix_data::Matrix Matrix;
+		typedef typename std::pair<std::size_t, std::size_t> Block;
+
+		Matrix & M = data.M;
 		std::string line;
 
 		//Step 0: Get first line
@@ -39,64 +53,65 @@ namespace t10 {
 			std::cerr << "Matrix is not square" << std::endl;
 			return false;
 		}
+		data.n = number_of_rows;
 		//matrix is well formatted, now get the size of the blocks for each processor
 		//1. calculate equally sized block sizes and remaining entries
 		const std::size_t num_proc = world.size();
-		std::cout << "num_proc" << num_proc << std::endl;
 		// for now ignore the fact that number of processors is not perfect square
 		const std::size_t p = std::sqrt(world.size());
-		std::cout << "p" << p << std::endl;
-		// assume proc id is 0 indexed
 		const std::size_t proc_id = world.rank();
-		std::cout << "proc_id" << proc_id << std::endl;
-		const std::size_t avg_block_size = number_of_rows/p;
-		std::cout << "avg" << avg_block_size << std::endl;
-		std::size_t block_size = avg_block_size;
-		std::cout << "block_size" << block_size << std::endl;
+		const std::size_t avg_block_size = number_of_rows / p;
+		// row size of block before resizing
+		std::size_t block_size1 = avg_block_size;
+		// col size of block before resizing
+		std::size_t block_size2 = avg_block_size;
+		// number of left-over elements
 		const std::size_t remaining = number_of_rows % p;
-		std::cout << "rem" << remaining << std::endl;
 		// row and column index of the block for this processor, from 0 to p-1, this is invariant
-		const std::size_t block_row = proc_id / p;
-		std::cout << "block_row" << block_row << std::endl;
-		const std::size_t block_col = proc_id % p;
-		std::cout << "col" << block_col << std::endl;
+		Block block = id_to_index(proc_id, p);
+		
+		const std::size_t block_row = block.first;
+		const std::size_t block_col = block.second;
+		data.block_row = block_row;
+		data.block_col = block_col;
 		// if remaining was > 0, this block size increases by 1 if the block is within the first remaining x remaining 
 		// blocks, as we distribute remaining entries among the first submatrix of blocks
-		if (block_row < remaining && block_col < remaining) {
-			++block_size;
-		}
-		block_size += block_row < remaining && block_col < remaining;
-		std::cout << "new block size" << block_size << std::endl;
+
+		block_size1 += block_row < remaining;
+		block_size2 += block_col < remaining;
 		// number of lines to skip to get to this block, sum of the block sizes of the blocks "above" it
 		// add the lesser of remaining number of elements and block_row index, because that many remaining elements
 		// have been distributed to the blocks "above" it
 		const std::size_t first_row = block_row * avg_block_size + std::min(remaining, block_row);
-		std::cout << "first row" << first_row << std::endl;
 		// similarly for columns
 		const std::size_t first_col = block_col * avg_block_size + std::min(remaining, block_col);
-		std::cout << "first col" << first_col << std::endl;
+		data.first_row = first_row;
+		data.first_col = first_col;
+		data.last_row = first_row + block_size1;
+		data.last_col = first_col + block_size2;
 		// now set the matrix size
-		M.resize(block_size, block_size);
+		M.resize(block_size1, block_size2);
 
 		in.clear();
 		in.seekg(0, std::ios::beg);
 		//Step 3: Read The File!
 		//Go to Beginning...
 		//... then go to the first_row line
-		for(std::size_t i =1; i < first_row; ++i) { std::getline(in, line); }
-		for(std::size_t i =0; i < block_size; ++i){
+		for(std::size_t i =0; i < first_row; ++i) { std::getline(in, line); }
+		for(std::size_t i =0; i < block_size1; ++i){
 			std::getline(in, line);
-			std::cout << "line: " << line << std::endl;
-			for (std::size_t j = 1; j < first_col; ++j){ 
+			for (std::size_t j = 0; j < first_col; ++j){ 
 				const std::size_t found = line.find_first_of(",");
+				line = line.substr( found+1);	
 			}
-			for( std::size_t j = 0; j < block_size; ++j){
+
+			for( std::size_t j = 0; j < block_size2; ++j){
 				const std::size_t found = line.find_first_of(",");
 				M(i,j) = atof( line.substr(0, found).c_str());
 				line = line.substr( found+1);
-//				std::cout << j << " " <<  M(i,j) << std::endl;
 			}
 		}
+		
 		return true;
 	}
 
@@ -177,26 +192,6 @@ namespace t10 {
 	  }
 	}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 	template< typename Matrix>
 	std::string print_matrix( const Matrix & M, std::size_t p=7){
 		std::string str;
@@ -269,4 +264,6 @@ namespace t10 {
 
 		return str;	
 	}
-} //end namespace t10
+}
+#endif
+ //end namespace t10

@@ -4,7 +4,7 @@ namespace t10 {
 		template<typename _Matrix, typename Communicator>
 	        struct Matrix_data {
 			//Internal Matrix Type
-	        	typedef typename _Matrix Matrix;
+	        	typedef _Matrix Matrix;
 	        	Matrix M;
 			//Overall matrix size
 	        	std::size_t n;
