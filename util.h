@@ -1,18 +1,29 @@
-#ifndef QR_ALGORITHM_H                                          
-#define QR_ALGORITHM_H                                          
-#define QR_ITERATION_OUTPUT  
+#ifndef T10_UTIL_H                                          
+#define T10_UTIL_H                                          
 namespace t10 {
-template<typename _Matrix>
-        struct Matrix_data {
-        typedef typename _Matrix Matrix;
-        Matrix M;
-        std::size_t n;
-        std::size_t first_row;
-        std::size_t last_row;
-        std::size_t first_col;
-        std::size_t last_col;
-        std::size_t block_row;
-        std::size_t block_col;
-}; // struct Matrix_data
+		template<typename _Matrix, typename Communicator>
+	        struct Matrix_data {
+			//Internal Matrix Type
+	        	typedef typename _Matrix Matrix;
+	        	Matrix M;
+			//Overall matrix size
+	        	std::size_t n;
+
+			//indices into the theoretical larger matrix
+	        	std::size_t first_row;
+	        	std::size_t last_row;
+	        	std::size_t first_col;
+	        	std::size_t last_col;
+	        	std::size_t block_row;
+	        	std::size_t block_col;
+			
+			/*
+ 			* Below is a list of communicators
+ 			*/ 	
+			Communicator row_comm;
+			Communicator col_comm;
+			Communicator antidiag_comm;
+		}; // struct Matrix_data
+
 }//end namespace t10
-#endif//QR_ALGORITHM_H
+#endif//T10_UTIL_H
