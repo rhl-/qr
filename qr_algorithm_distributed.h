@@ -120,13 +120,17 @@ namespace t10 {
 		} while( std::fabs(H(n-1,n-2)) > tol);
 		
 	}
-
-	template< typename Vector>
-	void compute_householder_vector( Vector & v){
+	//TODO: MPI group
+	template< typename Vector, typename Communicator>
+	void compute_householder_vector( Vector & v, const Communicator & column_comm){
 		typedef typename Vector::value_type Value;
 		Value x = v[0];
+			
 		Value beta = 1.0;
-		const Value sigma = ublas::inner_prod(v,v) - x*x;
+		const Value inner_prod = ublas::inner_prod(v,v);
+		Value sigma = 0;
+		mpi::all_reduce(column_comm, inner_prod, sigma, std::plus< Value>) 
+		sigma -= x*x;
 		if (sigma != 0){
 			const Value mu = std::sqrt(x*x + sigma);
 			(x <= 0)? x -= mu: x = -sigma/(x + mu);
@@ -160,54 +164,46 @@ namespace t10 {
 	}
 
 	
-	template< typename Matrix>
-	void hessenberg( Matrix & M){
+	template< typename Matrix_data, typename Communicator>
+	void hessenberg( Matrix_data & data, const Communicator & world){
+		typedef typename Matrix_data::Matrix Matrix;
 		typedef typename Matrix::value_type Value;
 		typedef typename ublas::matrix_column< Matrix> Matrix_column;
 		typedef typename ublas::vector< Value> Vector;
 		typedef typename ublas::vector_range< Vector> Vector_range;
-		const std::size_t n = M.size1();
-		Value beta=0;
+		Matrix & M = data.M;
+		const std::size_t & n = data.n;
+		
 		//Algorithm 7.4.2 GVL
 		for (std::size_t k = 0; k < n-2; ++k){
+			if( k < data.col_start){
+				//TODO: MPI calls to receive vs and do work
+				const Value beta=vs[0]; vs[0]=1;
+				apply_householder_left( beta, vs, M, k);
+				apply_householder_right( beta, vs, M, k);
+			}
+			else if( k <= data.col_end){
+				const std::size_t col_idx = k-data.col_start;
+				Vector vs = ublas::subrange(Matrix_column(M,col_idx), col_idx+1, n);
+				compute_householder_vector(vs, world);
+			}
+			else {
+			}
 			//create a copy of the correct piece of the k^th column
-			Vector vs = ublas::subrange(Matrix_column(M,k), k+1, n);
 			//compute householder vector
-			compute_householder_vector(vs);
 			//hackery to store beta without extra space
-			beta=vs[0]; vs[0]=1;
-			apply_householder_left( beta, vs, M, k);
-			apply_householder_right( beta, vs, M, k);
 			//the algorithm hessenberg storing Q's would store v here
 			//(betas would become a vector)
 		}
 	}
 
-	template< typename Matrix>
-	void qr( Matrix & M){
-		typedef typename Matrix::value_type Value;
-		switch(M.size1()) {
-		case 0:
-		case 1:
-			return;
-		case 2:
-			{
-			const Value a = M(0,0)+M(1,1);
-			const Value b = std::sqrt(4*M(1,0)*M(0,1) + std::pow((M(0,0)-M(1,1)),2));
-			M(0,0) = (a + b)/2;
-			M(1,1) = (a - b)/2;
-			M(1,0) = 0;
-			M(0,1) = 0;
-			}	
-			return;
-		default:
-			typedef typename ublas::matrix_range<Matrix> Matrix_range;
-			typedef typename ublas::range Range;
-			hessenberg(M);
-			for (std::size_t i = M.size1(); i > 1; --i){
+	template< typename Matrix, typename Communicator>
+	void qr( Matrix & M, const Communicator & world){
+			hessenberg(M, world);
+			/*for (std::size_t i = M.size1(); i > 1; --i){
 				Matrix_range R(M, Range (0, i), Range (0, i));
 				qr_iteration( R);
-			}
+			}*/
 		}
 	}
 
