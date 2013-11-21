@@ -101,17 +101,16 @@ namespace t10 {
 		for(std::size_t i =0; i < block_size1; ++i){
 			std::getline(in, line);
 			for (std::size_t j = 0; j < first_col; ++j){ 
-				const std::size_t found = line.find_first_of(",");
-				line = line.substr( found+1);	
+				const std::size_t found = line.find_first_of(delimeter);
+				line = line.substr( found+1);
 			}
 
 			for( std::size_t j = 0; j < block_size2; ++j){
-				const std::size_t found = line.find_first_of(",");
+				const std::size_t found = line.find_first_of(delimeter);
 				M(i,j) = atof( line.substr(0, found).c_str());
 				line = line.substr( found+1);
 			}
 		}
-		
 		return true;
 	}
 
@@ -126,20 +125,8 @@ namespace t10 {
 		return false;
 	}
 	template< typename String, typename Matrix, typename Communicator>
-	void read_matrix( const String & filename, Matrix & M, const Communicator & world){
-		//0. open file (std::istream)
-		//1. determine file type
-			//a) determined by extension
-			//b) valid extensions
-				//csv
-				//matrixmarket
-		//2. determine matrix size k
-			//take N # of rows in original matrix, divide by sqrt( num_processors)
-		//3. allocate output memory i.e. k x k matrix
-				//M.resize(k,k)
-		//4. read appropriate part of input into output
-				//seek to place in file and read elt by elt
-
+	void read_matrix( const String & filename, Matrix & M, 
+			  const Communicator & world){
 		const std::string file_ext(filename.substr(filename.find_last_of(".") + 1));
 		std::ifstream in(filename.c_str());
 		if (!in.good()){ 
