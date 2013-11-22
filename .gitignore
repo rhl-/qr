@@ -6,3 +6,5 @@ qr
 qrp
 qrs
 run_qr.moab
+cluster.sh
+mpi_out
