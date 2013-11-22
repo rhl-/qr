@@ -15,7 +15,8 @@ namespace ublas = boost::numeric::ublas;
 namespace t10 {
 	//GVL Section 5.1.9
 	template< typename Value>
-	void compute_givens(const Value & a, const Value & b, Value & c, Value & s){
+	void compute_givens(const Value & a, const Value & b, 
+			    Value & c, Value & s){
 			if (b == 0) { c = 1; s = 0; return; }
 			if( std::fabs(a) < std::fabs(b)){
 				const Value tau = -a/b;
@@ -40,13 +41,18 @@ namespace t10 {
 	template< typename Value>
 	void decode_givens( const Value & rho, Value & c, Value & s ){
 		if (rho == 1) { c = 0; s = 1; return; }
-		if (std::fabs(rho) < 1) {s = 2*rho; c = std::sqrt(1 -std::pow(s,2)); return;}
+		if (std::fabs(rho) < 1) { 
+			s = 2*rho; 
+			c = std::sqrt(1 -std::pow(s,2)); 
+			return;
+		}
 		c = 2/rho; s = std::sqrt(1-std::pow(c,2));
 	} 
 	
 	template< typename Matrix>
 	typename Matrix::value_type apply_givens_left( Matrix & M, 
-						       const std::size_t i, const std::size_t k){
+						       const std::size_t i, 
+						       const std::size_t k){
 		typedef typename Matrix::value_type Value;
 		Value c=0.0, s=0.0;
 		compute_givens(M(i,i),M(k,i),c,s);
@@ -60,7 +66,8 @@ namespace t10 {
 		return encode_givens(c,s);
 	}
 	template< typename Matrix>
-	void apply_givens_right( Matrix & M, const typename Matrix::value_type rho, 
+	void apply_givens_right( Matrix & M, 
+				 const typename Matrix::value_type rho, 
 				 const std::size_t i, const std::size_t k){
 		typename Matrix::value_type c=0.0,s=0.0;
 		decode_givens(rho, c,s);
@@ -137,7 +144,9 @@ namespace t10 {
 					 const Communicator & column_comm){
 		typedef typename Vector::value_type Value;
 		Value x = v[0];
-			
+		//root process should be zero, according to at least OpenMPI
+		//documentation
+		mpi::broadcast( column_comm, x, 0);
 		Value beta = 1.0;
 		const Value inner_prod = ublas::inner_prod(v,v);
 		Value sigma = 0;
@@ -190,8 +199,9 @@ namespace t10 {
 		typedef typename ublas::vector_range< Vector> Vector_range;
 		Matrix & M = data.M;
 		const std::size_t & n = data.n;
-		
 		//Algorithm 7.4.2 GVL
+		std::cout << "Processor: " << data.world.rank()
+			  << " is in hessenberg()" << std::endl;
 		for (std::size_t k = 0; k < n-2; ++k){
 			if( k < data.first_col){
 				//TODO: MPI calls to receive vs and do work
@@ -203,10 +213,13 @@ namespace t10 {
 				const std::size_t col_idx = k-data.first_col;
 				Matrix_column col(M,col_idx);
 				Vector vs = ublas::subrange(col, col_idx+1, n);
-				compute_householder_vector(vs, data.col_comm);
+				compute_householder_vector(vs, data.l_col_comm);
+				std::cout << "Processor: " << data.world.rank()
+					  << " has computed: " 
+					  << print_vector(col)
+					  << std::endl;	
 			}
-			else {
-			}
+			else {}
 			//create a copy of the correct piece of the k^th column
 			//compute householder vector
 			//hackery to store beta without extra space

@@ -212,7 +212,32 @@ namespace t10 {
 	        std::exit( -1);
 	  }
 	}
+	template< typename Vector>
+	std::string print_vector( const Vector & V, std::size_t p=7){
+		std::string str;
+		std::stringstream ss;
+		ss.setf( std::ios::fixed, std:: ios::floatfield );
+		ss << std::setw( p) << std::setprecision( p) <<  V;
+		str = ss.str();
+		//kill size thing
+		std::size_t lefts = str.find(std::string("["));
+		std::size_t rights = str.find(std::string("]"));
+		str.replace(lefts,rights-lefts+1,"");
+		
+		std::size_t found = str.find(std::string("("));
+		str.replace(found,1,std::string("\n"));
+	
+		found = str.find(std::string(")"));
+		str.replace(found,1,std::string(""));
+		
+		found = str.find(std::string(","));
+		while( found != std::string::npos){
+			str.replace(found,1,std::string("\n"));
+			found = str.find(std::string(","));
+		}
+		return str;
 
+	}
 	template< typename Matrix>
 	std::string print_matrix( const Matrix & M, std::size_t p=7){
 		std::string str;
@@ -260,25 +285,26 @@ namespace t10 {
 		std::stringstream ss;
 		ss << M;
 		str = ss.str();
-		std::size_t lefts = str.find(std::string("["));
-		std::size_t rights = str.find(std::string("]"));
-		str.replace(lefts,rights-lefts+1,"");
-		std::size_t found = str.find(std::string("(("));
-		str.replace(found,2,std::string("["));
-		found = str.find(std::string("))"));
-		str.replace(found,2,std::string("]"));
-		found = str.find(std::string("),"));
-		while( found != std::string::npos){
-			str.replace(found,2,std::string(";"));
+		if(M.size1() > 1 && M.size2() > 1){
+			std::size_t lefts = str.find(std::string("["));
+			std::size_t rights = str.find(std::string("]"));
+			str.replace(lefts,rights-lefts+1,"");
+			std::size_t found = str.find(std::string("(("));
+			str.replace(found,2,std::string("["));
+			found = str.find(std::string("))"));
+			str.replace(found,2,std::string("]"));
 			found = str.find(std::string("),"));
-		}
+			while( found != std::string::npos){
+				str.replace(found,2,std::string(";"));
+				found = str.find(std::string("),"));
+			}
 
-		found = str.find(std::string("("));
-		while( found != std::string::npos){
-			str.replace(found,1,std::string(""));
 			found = str.find(std::string("("));
+			while( found != std::string::npos){
+				str.replace(found,1,std::string(""));
+				found = str.find(std::string("("));
+			}
 		}
-
 		return str;	
 	}
 }
