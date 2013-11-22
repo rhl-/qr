@@ -212,24 +212,27 @@ namespace t10 {
 				//apply_householder_left( beta, vs, M, k);
 				//apply_householder_right( beta, vs, M, k);
 			}
-			else if(data.below() && k <= data.last_col){ 
+			else if(data.below() && k < data.last_col){ 
 				const std::size_t col_idx = k-data.first_col;
 				std::cout << "Processor: " << data.world.rank()
 				<< " can compute a householder vector for "
 				<< "local column: " << col_idx << " of " 
 				<< M.size1() << " x " << M.size2()
-				<< std::endl << "\t\t"
+				<< std::endl << "\t\t\t"
 				<< " this is global column " << k << " of " 
 				<< n << " x " << n
 				<< std::endl;
-				/*Matrix_column col(M,col_idx);
-				Vector vs = ublas::subrange(col, col_idx+1, n);
-				compute_householder_vector(vs, data.l_col_comm);
+				Matrix_column col(M,col_idx);
+				Vector vs = ublas::subrange( col,
+							     col_idx+1, 
+							     data.last_col-k);
+				//compute_householder_vector(vs, 
+				//			     data.l_col_comm);
 				std::cout << "Processor: " << data.world.rank()
 					  << " has computed: " 
 					  << print_vector(col)
 					  << std::endl;	
-				*/
+				
 			}
 			else if( !data.diag() ){ 
 				ready_to_load_balance = true;
