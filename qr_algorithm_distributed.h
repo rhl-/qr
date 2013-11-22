@@ -164,8 +164,8 @@ namespace t10 {
 	}
 
 	
-	template< typename Matrix_data, typename Communicator>
-	void hessenberg( Matrix_data & data, const Communicator & world){
+	template< typename Matrix_data>
+	void hessenberg( Matrix_data & data){
 		typedef typename Matrix_data::Matrix Matrix;
 		typedef typename Matrix::value_type Value;
 		typedef typename ublas::matrix_column< Matrix> Matrix_column;
@@ -197,9 +197,9 @@ namespace t10 {
 		}
 	}
 
-	template< typename Matrix, typename Communicator>
-	void qr( Matrix & M, const Communicator & world){
-			hessenberg(M, world);
+	template< typename Matrix_data>
+	void qr( Matrix_data & data){
+			hessenberg( data);
 			/*for (std::size_t i = M.size1(); i > 1; --i){
 				Matrix_range R(M, Range (0, i), Range (0, i));
 				qr_iteration( R);
