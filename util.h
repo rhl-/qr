@@ -3,6 +3,7 @@
 #define UTIL_DEBUG 
 //Boost MPI
 #include <boost/mpi.hpp>
+#include <algorithm>
 namespace mpi = boost::mpi;
 namespace t10 {
 
@@ -38,19 +39,29 @@ namespace t10 {
 		data.partner = index_to_id( c,r,  row_length);
 		const std::size_t anti_m = std::min(r+c, row_length-1);
 		const std::size_t anti_size = 2*anti_m-(r+c) + 1;
-		Vector ant( anti_size, id);
-		Vector row( row_length, id);
-		Vector col( row_length, id);
-		Vector pan( 2*(row_length-diag1)-1, id);
+		Vector & ant = data.ant;
+		ant.resize( anti_size, id);
+		Vector & row = data.row;
+		row.resize( row_length, id);
+		Vector & col = data.col;
+		col.resize( row_length, id);
+		Vector & pan = data.pan;
+		pan.resize( 2*(row_length-diag1)-1, id);
 		//lower col
-		Vector l_col( row_length - r, id);
+		Vector & l_col = data.l_col;
+		l_col.resize( row_length - r, id);
 		//right row
-		Vector r_row( row_length - c, id);
+		Vector & r_row = data.row;
+		r_row.resize( row_length - c, id);
 		// partner row and col (full)
-		Vector p_row( row_length, data.partner);
-		Vector p_col( row_length, data.partner);
+		Vector & p_row = data.p_row;
+		p_row.resize( row_length, data.partner);
+		Vector & p_col = data.p_col;
+		p_col.resize( row_length, data.partner);
+		//lower principal minor block?
+		
 		// partner lower row and right col (I dont think we need this)
-
+		
 		//create panel indices
 		Iterator end = pan.begin()+(row_length-diag1);
 		std::size_t a = diag1;
@@ -93,14 +104,21 @@ namespace t10 {
                         *i = c*row_length + k;
                         *j = k*row_length + r;
                 }
-		#ifdef UTIL_DEBUG
+
+		std::sort (row.begin(), row.end()); 
+	/*	#ifdef UTIL_DEBUG
 			std::cout << "Processor: " << world.rank() <<  std::endl
 				  << "Partner: " << data.partner << std::endl
 				  << "row: " << row << std::endl 
 				  << "col: " << col << std::endl 
 				  << "ant: " << ant << std::endl
 				  << "pan: " << pan << std::endl; 
-		#endif
+		#endif*/
+		std::cout << "Processor: " << world.rank() <<  std::endl
+                                << "Lower col: " << l_col << std::endl
+				<< "Right row: " << r_row << std::endl
+				<< "Partner row: " << p_row << std::endl
+				<< "Partner col: " << p_col << std::endl;
 		mpi::group row_group = world.group().include( row.begin(), 
 								row.end());
 		mpi::group col_group = world.group().include( col.begin(), 
@@ -125,7 +143,7 @@ namespace t10 {
                 data.l_col_comm = mpi::communicator(world, l_col_group);
                 data.p_col_comm = mpi::communicator(world, p_col_group);
                 data.p_row_comm = mpi::communicator(world, p_row_group);
-		#ifdef UTIL_DEBUG
+		/*#ifdef UTIL_DEBUG
 		std::cout << "Processor: " << world.rank() << " is " 
 			  << std::endl
 			  << data.row_comm.rank() << " of " 
@@ -143,7 +161,7 @@ namespace t10 {
 			  << data.pan_comm.rank() << " of " 
 			  << data.pan_comm.size() << " in pan_comm" 
 			  << std::endl
-
+		
                           << data.l_col_comm.rank() << " of "
                           << data.l_col_comm.size() << " in l_col_comm"
                           << std::endl
@@ -161,11 +179,12 @@ namespace t10 {
                           << std::endl
 			  << "-------------------------" 
 			  << std::endl;
-		#endif
+		#endif*/
 	}
 
 	template<typename _Matrix, typename _Communicator>
 	struct Matrix_data {
+		typedef typename std::vector< std::size_t> Vector;
 		//Internal Matrix Type
 		typedef _Matrix Matrix;
 		typedef _Communicator Communicator;
@@ -181,6 +200,18 @@ namespace t10 {
 		std::size_t block_row;
 		std::size_t block_col;
 		std::size_t partner;		
+		Vector ant;
+		Vector row;
+		Vector col;
+		Vector pan;
+		// processor below
+		Vector l_col;
+		// proc to the right of
+		Vector r_row;
+		// proc on partner proc row
+		Vector p_row;
+		// proc on partner proc col
+		Vector p_col;
 		/*
  		* Below is a list of communicators
  		*/ 	
