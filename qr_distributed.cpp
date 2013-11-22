@@ -42,12 +42,8 @@ int main( int argc, char * argv[]){
 	po::variables_map vm;
 	t10::process_args( argc, argv, vm);
 	std::string filename( vm[ "input-file"].as< std::string>());
-	t10::read_matrix( filename, data, data.world);
+	t10::read_matrix( filename, data);
 	t10::construct_communicators( data);
 
-	std::stringstream ss;
-	ss << "Processor: " << data.world.rank() << " has ";
-	ss << t10::print_matrix( data.M) << std::endl;
-	std::cout << ss.str() << std::endl;
-	/*t10::qr( data);*/
+	t10::qr( data);
 }

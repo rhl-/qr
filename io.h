@@ -39,12 +39,12 @@ Stream& operator<<( Stream & out, const  std::vector< T> & v){
 
 namespace t10 {
 	//TODO: Delimiter should be passed into program as an option 
-	template< typename Stream, typename Matrix_data, typename Communicator>
-	bool read_csv( Stream & in, Matrix_data & data, 
-		       const Communicator & world, char delimiter=','){
+	template< typename Stream, typename Matrix_data>
+	bool read_csv( Stream & in, Matrix_data & data, char delimiter=','){
 		typedef typename Matrix_data::Matrix Matrix;
+		typedef typename Matrix_data::Communicator Communicator;
 		typedef typename std::pair<std::size_t, std::size_t> Block;
-
+		const Communicator & world = data.world;
 		Matrix & M = data.M;
 		std::string line;
 
@@ -144,19 +144,24 @@ namespace t10 {
 		return true;
 	}
 
-	template< typename Stream, typename Matrix, typename Communicator>
-	bool read_mm( Stream & in, Matrix & M, const Communicator & World){
+	template< typename Stream, typename Matrix_data>
+	bool read_mm( Stream & in, Matrix_data & data){
 		std::cerr << "Not Yet Implemented Yet" << std::endl;
 		return false;
 	}
-	template< typename Stream, typename Matrix, typename Communicator>
-	bool read_mat( Stream & in, Matrix & M, const Communicator & World){
+
+	template< typename Stream, typename Matrix_data>
+	bool read_mat( Stream & in, Matrix_data & data){
 		std::cerr << "Not Yet Implemented Yet" << std::endl;
 		return false;
 	}
-	template< typename String, typename Matrix, typename Communicator>
-	void read_matrix( const String & filename, Matrix & M, 
-			  const Communicator & world){
+
+	template< typename String, typename Matrix_data>
+	void read_matrix( const String & filename, Matrix_data & data){
+		typedef typename Matrix_data::Matrix Matrix;
+		typedef typename Matrix_data::Communicator Communicator;
+		const Communicator & world = data.world;
+		Matrix & M = data.M;
 		const std::string file_ext( 
 			filename.substr( filename.find_last_of(".") + 1));
 		std::ifstream in(filename.c_str());
@@ -166,19 +171,19 @@ namespace t10 {
 		}
 		//TODO: Error checking if file doesn't open.
 		if (file_ext == "csv") {
-			if (!read_csv( in, M, world)){
+			if (!read_csv( in, data)){
 				std::cerr << "Error Reading CSV file";
 				std::cerr << std::endl;
 				std::exit( -1);
 			}
 		} else if (file_ext == "mm") {
-			if (!read_mm( in, M, world)){
+			if (!read_mm( in, data)){
 				std::cerr << "Error Reading Matrix Market file";
 				std::cerr << std::endl;
 				std::exit( -1);
 			}
 		} else if (file_ext == "mat") {
-			if (!read_mat( in, M, world)){
+			if (!read_mat( in, data)){
 				std::cerr << "Error Reading .Mat file";
 				std::cerr << std::endl;
 				std::exit( -1);
