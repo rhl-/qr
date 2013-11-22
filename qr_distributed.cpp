@@ -16,7 +16,7 @@
 #include <boost/mpi/communicator.hpp>
 
 //PROJECT
-#include "qr_algorithm_serial.h"
+#include "qr_algorithm_distributed.h"
 #include "util.h"
 
 namespace ublas = boost::numeric::ublas;
@@ -49,5 +49,5 @@ int main( int argc, char * argv[]){
 	ss << "Processor: " << data.world.rank() << " has ";
 	ss << t10::print_matrix( data.M) << std::endl;
 	std::cout << ss.str() << std::endl;
-	t10::qr(M, data);
+	t10::qr( data);
 }

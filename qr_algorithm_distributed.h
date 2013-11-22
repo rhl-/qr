@@ -82,30 +82,39 @@ namespace t10 {
 		#endif	
 		std::size_t n = H.size1();
 		typedef typename Matrix::value_type Value;
-		typedef typename ublas::diagonal_adaptor< Matrix> Diagonal_adapter;
+		typedef typename ublas::diagonal_adaptor< Matrix> 
+							Diagonal_adapter;
 		typedef typename ublas::scalar_matrix< Value> Scalar;
 		typedef ublas::diagonal_adaptor< Scalar> Diagonal_scalar;
 		std::vector< typename Matrix::value_type> givens(n-1, 0.0); 
 		do{
 			const Value a = H(n-2,n-2)+H(n-1,n-1);
-			const Value b = std::sqrt(4*H(n-1,n-2)*H(n-2,n-1) + std::pow((H(n-2,n-2)-H(n-1,n-1)),2));
+			const Value b = std::sqrt(4*H(n-1,n-2)*H(n-2,n-1) + 
+					std::pow((H(n-2,n-2)-H(n-1,n-1)),2));
 			const Value e1 = (a+b)/2, e2 = (a-b)/2;
-			const Value shift = (std::fabs(e1- H(n-1,n-1)) < std::fabs(e2 - H(n-1,n-1)))? e1 : e2;
+			const Value shift = (std::fabs(e1- H(n-1,n-1)) < 
+					std::fabs(e2 - H(n-1,n-1)))? e1 : e2;
 			
 			Scalar mu_s(n,n,shift);
 			const Diagonal_scalar mu( mu_s );
 			Diagonal_adapter D(H);
 			D -= mu;
-			for (std::size_t i = 0; i < n-1; ++i){ givens[i]=apply_givens_left(H,i,i+1); }
+			for (std::size_t i = 0; i < n-1; ++i){ 
+				givens[i] = apply_givens_left(H,i,i+1); 
+			}
 			
 			#ifdef DEBUG_QR_ITERATION
-				std::cout << "Left Apply: H = " << print_matrix( H) << std::endl;
+				std::cout << "Left Apply: H = " 
+					<< print_matrix( H) << std::endl;
 			#endif //DEBUG_QR_ITERATION
 			
-			for (std::size_t i = 0; i < n-1; ++i){ apply_givens_right(H,givens[i],i,i+1); }
+			for (std::size_t i = 0; i < n-1; ++i){ 
+				apply_givens_right(H,givens[i],i,i+1); 	
+			}
 			
 			#ifdef DEBUG_QR_ITERATION
-				std::cout << "Right Apply H = " << print_matrix( H) << std::endl;
+				std::cout << "Right Apply H = " 
+					<< print_matrix( H) << std::endl;
 			#endif //DEBUG_QR_ITERATION
 			
 			//Unshift
@@ -113,23 +122,27 @@ namespace t10 {
 			
 			#ifdef QR_ITERATION_OUTPUT
 			std::cout.precision( 7);
-			std::cout.setf( std::ios::fixed, std:: ios::floatfield );
-			std::cout << "---- Shift: " << std::setw( 10) << shift  << std::endl;
-			std::cout << "---- Error: " << std::setw( 10)  << std::fabs(H(n-1,n-2)) << std::endl;
+			std::cout.setf( std::ios::fixed, std:: ios::floatfield);
+			std::cout << "---- Shift: " << std::setw( 10) << shift  
+			<< std::endl;
+			std::cout << "---- Error: " << std::setw( 10)  
+			<< std::fabs(H(n-1,n-2)) << std::endl;
 			#endif //DEBUG_QR_ITERATION
 		} while( std::fabs(H(n-1,n-2)) > tol);
 		
 	}
 	//TODO: MPI group
 	template< typename Vector, typename Communicator>
-	void compute_householder_vector( Vector & v, const Communicator & column_comm){
+	void compute_householder_vector( Vector & v, 
+					 const Communicator & column_comm){
 		typedef typename Vector::value_type Value;
 		Value x = v[0];
 			
 		Value beta = 1.0;
 		const Value inner_prod = ublas::inner_prod(v,v);
 		Value sigma = 0;
-		mpi::all_reduce(column_comm, inner_prod, sigma, std::plus< Value>) 
+		mpi::all_reduce(column_comm, inner_prod, 
+				sigma, std::plus< Value>()); 
 		sigma -= x*x;
 		if (sigma != 0){
 			const Value mu = std::sqrt(x*x + sigma);
@@ -143,23 +156,27 @@ namespace t10 {
 	
 	template< typename Vector, typename Matrix>
 	void apply_householder_left( const typename Vector::value_type & beta, 
-				     const Vector & v, Matrix & M, const std::size_t k = 0){
+				     const Vector & v, Matrix & M, 
+				     const std::size_t k = 0){
 		if (beta != 0){
 			ublas::range r1(k+1, M.size1());
 			ublas::range r2(k, M.size2());
 			ublas::matrix_range< Matrix> S(M, r1,r2);
-			S -= beta*ublas::outer_prod( v, ublas::prod<Vector>(ublas::trans(v),S));
+			S -= beta*ublas::outer_prod( v, 
+					ublas::prod<Vector>(ublas::trans(v),S));
 		}
 	}
 
 	template< typename Vector, typename Matrix>
 	void apply_householder_right( const typename Vector::value_type & beta, 
-				      const Vector & v, Matrix & M, const std::size_t k = 0){
+				      const Vector & v, 
+				      Matrix & M, const std::size_t k = 0){
 		if (beta != 0){
 			ublas::range r1(0, M.size1());
 			ublas::range r2(k+1, M.size2());
 			ublas::matrix_range< Matrix> S(M, r1,r2);
-			S -= beta*ublas::outer_prod( ublas::prod<Vector>(S,v), v);
+			S -= beta*ublas::outer_prod( 
+				ublas::prod<Vector>(S,v), v);
 		}
 	}
 
@@ -176,23 +193,25 @@ namespace t10 {
 		
 		//Algorithm 7.4.2 GVL
 		for (std::size_t k = 0; k < n-2; ++k){
-			if( k < data.col_start){
+			if( k < data.first_col){
 				//TODO: MPI calls to receive vs and do work
-				const Value beta=vs[0]; vs[0]=1;
-				apply_householder_left( beta, vs, M, k);
-				apply_householder_right( beta, vs, M, k);
+				//const Value beta=vs[0]; vs[0]=1;
+				//apply_householder_left( beta, vs, M, k);
+				//apply_householder_right( beta, vs, M, k);
 			}
-			else if( k <= data.col_end){
-				const std::size_t col_idx = k-data.col_start;
-				Vector vs = ublas::subrange(Matrix_column(M,col_idx), col_idx+1, n);
-				compute_householder_vector(vs, world);
+			else if( k <= data.last_col){
+				const std::size_t col_idx = k-data.first_col;
+				Matrix_column col(M,col_idx);
+				Vector vs = ublas::subrange(col, col_idx+1, n);
+				compute_householder_vector(vs, data.col_comm);
 			}
 			else {
 			}
 			//create a copy of the correct piece of the k^th column
 			//compute householder vector
 			//hackery to store beta without extra space
-			//the algorithm hessenberg storing Q's would store v here
+			//the algorithm hessenberg storing Q's 
+			//would store v here
 			//(betas would become a vector)
 		}
 	}
@@ -204,7 +223,6 @@ namespace t10 {
 				Matrix_range R(M, Range (0, i), Range (0, i));
 				qr_iteration( R);
 			}*/
-		}
 	}
 
 } //end namespace t10
