@@ -199,6 +199,9 @@ namespace t10 {
 	template<typename _Matrix, typename _Communicator>
 	struct Matrix_data {
 		typedef typename std::vector< std::size_t> Vector;
+		bool above() const { return block_row <= block_col;}
+		bool below() const { return block_col <= block_row;}
+		bool diag()  const { return block_row == block_col; }
 		//Internal Matrix Type
 		typedef _Matrix Matrix;
 		typedef _Communicator Communicator;

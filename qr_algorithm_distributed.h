@@ -199,33 +199,49 @@ namespace t10 {
 		typedef typename ublas::vector_range< Vector> Vector_range;
 		Matrix & M = data.M;
 		const std::size_t & n = data.n;
+		bool ready_to_load_balance=false;
 		//Algorithm 7.4.2 GVL
 		std::cout << "Processor: " << data.world.rank()
 			  << " is in hessenberg()" << std::endl;
 		for (std::size_t k = 0; k < n-2; ++k){
 			if( k < data.first_col){
+				std::cout << "Processor: " << data.world.rank()
+				<< " would normally wait for work" << std::endl;
 				//TODO: MPI calls to receive vs and do work
 				//const Value beta=vs[0]; vs[0]=1;
 				//apply_householder_left( beta, vs, M, k);
 				//apply_householder_right( beta, vs, M, k);
 			}
-			else if( k <= data.last_col){
+			else if(data.below() && k <= data.last_col){ 
 				const std::size_t col_idx = k-data.first_col;
-				Matrix_column col(M,col_idx);
+				std::cout << "Processor: " << data.world.rank()
+				<< " can compute a householder vector for "
+				<< "local column: " << col_idx << " of " 
+				<< M.size1() << " x " << M.size2()
+				<< std::endl << "\t\t"
+				<< " this is global column " << k << " of " 
+				<< n << " x " << n
+				<< std::endl;
+				/*Matrix_column col(M,col_idx);
 				Vector vs = ublas::subrange(col, col_idx+1, n);
 				compute_householder_vector(vs, data.l_col_comm);
 				std::cout << "Processor: " << data.world.rank()
 					  << " has computed: " 
 					  << print_vector(col)
 					  << std::endl;	
+				*/
 			}
-			else {}
-			//create a copy of the correct piece of the k^th column
-			//compute householder vector
-			//hackery to store beta without extra space
-			//the algorithm hessenberg storing Q's 
-			//would store v here
-			//(betas would become a vector)
+			else if( !data.diag() ){ 
+				ready_to_load_balance = true;
+				break;
+			}
+		}
+		if (ready_to_load_balance){
+			std::cout << "Processor: " << data.world.rank()
+				  << " Would normally load balance with"
+				  << " " << data.partner 
+				  << " after having done stuff" 
+				  << std::endl;
 		}
 	}
 
