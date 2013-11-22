@@ -49,5 +49,5 @@ int main( int argc, char * argv[]){
 	ss << "Processor: " << data.world.rank() << " has ";
 	ss << t10::print_matrix( data.M) << std::endl;
 	std::cout << ss.str() << std::endl;
-	t10::qr(M, data);
+	t10::qr( data);
 }
