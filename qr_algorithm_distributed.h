@@ -140,7 +140,7 @@ namespace t10 {
 	}
 	//TODO: MPI group
 	template< typename Vector, typename Communicator>
-	void compute_householder_vector( Vector & v, 
+	typename Vector::value_type compute_householder_vector( Vector & v, 
 					 const Communicator & column_comm){
 		typedef typename Vector::value_type Value;
 		Value x = v[0];
@@ -160,7 +160,7 @@ namespace t10 {
 			beta = (2.0*y)/(y+sigma);
 			v /= x;
 		}
-		v[0] = beta;
+		return beta;
 	}
 	
 	template< typename Vector, typename Matrix>
@@ -215,22 +215,25 @@ namespace t10 {
 			else if(data.below() && k < data.last_col){ 
 				const std::size_t col_idx = k-data.first_col;
 				std::cout << "Processor: " << data.world.rank()
-				<< " can compute a householder vector for "
-				<< "local column: " << col_idx << " of " 
+				<< " housev local column: " << col_idx << " of "
 				<< M.size1() << " x " << M.size2()
 				<< std::endl << "\t\t\t"
 				<< " this is global column " << k << " of " 
 				<< n << " x " << n
+				<< std::endl
+				<< "indices: [" << col_idx << " , " 
+				<< M.size1() << " ]" 
 				<< std::endl;
 				Matrix_column col(M,col_idx);
+				std::size_t offset = 
 				Vector vs = ublas::subrange( col,
-							     col_idx+1, 
-							     data.last_col-k);
-				//compute_householder_vector(vs, 
-				//			     data.l_col_comm);
+							     col_idx+offset, 
+							     M.size1());
+				//compute_householder_vector( vs, 
+				//			    data.l_col_comm);
 				std::cout << "Processor: " << data.world.rank()
 					  << " has computed: " 
-					  << print_vector(col)
+					  << print_vector(vs)
 					  << std::endl;	
 				
 			}
