@@ -97,7 +97,7 @@ namespace t10 {
 
 		//create right row indices
 		for (Iterator i = r_row.begin(); i != r_row.end(); ++i) {
-			const std::size_t dst = std::distance(r_row.begin(), j);
+			const std::size_t dst = std::distance(r_row.begin(), i);
 			const std::size_t k = dst + c;
 			*i = r*row_length + k;
 		}
