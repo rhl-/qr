@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #MOAB -N read_matrix
-#MOAB -l nodes=4
+#MOAB -l nodes=9
 #MOAB -m ab
 #MOAB -j oe
 #MOAB -l walltime=00:01:00

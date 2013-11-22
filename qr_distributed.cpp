@@ -36,17 +36,18 @@ typedef t10::Matrix_data< Matrix, Communicator> Matrix_data;
 int main( int argc, char * argv[]){
 	//initialize mpi
 	mpi::environment env(argc, argv);
-  	Communicator world;
+	Matrix_data data;
+		
 	//read input
 	po::variables_map vm;
 	t10::process_args( argc, argv, vm);
 	std::string filename( vm[ "input-file"].as< std::string>());
-	Matrix_data data;
-	
-	t10::read_matrix( filename, data, world);
+	t10::read_matrix( filename, data, data.world);
+	t10::construct_communicators( data);
+
 	std::stringstream ss;
-	ss << "Processor: " << world.rank() << " has ";
+	ss << "Processor: " << data.world.rank() << " has ";
 	ss << t10::print_matrix( data.M) << std::endl;
 	std::cout << ss.str() << std::endl;
-//	t10::qr(M, world);
+//	t10::qr(M, data);
 }

@@ -6,7 +6,6 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-#include "mmio.h"
 
 //BOOST MPI
 #include <boost/mpi/environment.hpp>
@@ -15,20 +14,34 @@
 //BOOST PROGRAM OPTIONS
 #include <boost/program_options.hpp>
 
+//MATRIX MARKET
+#include "mmio.h"
+
+//PROJECT
+#include "util.h"
+
 namespace ublas = boost::numeric::ublas;
 namespace po = boost::program_options;
-namespace t10 {
-	
-        std::pair<std::size_t, std::size_t> id_to_index(const std::size_t & proc_id, const std::size_t & p) {
-                return std::make_pair(proc_id / p, proc_id % p);
-        }
 
-        std::size_t index_to_id(const std::size_t & block_row, const std::size_t & block_col, const std::size_t & p) {
-                return block_row * p + block_col;
-        }
+
+//It is important that this is outside of a namespace.
+template< typename Stream, typename T>
+Stream& operator<<( Stream & out, const  std::vector< T> & v){
+	typedef typename std::vector< T> Vector;
+	typedef typename Vector::const_iterator Iterator;
+	for(Iterator i = v.begin(); i != v.end(); ++i){
+		out << *i;
+		if (i+1 != v.end()){ out << ", ";}
+	}
+	return out;
+}
+
+
+namespace t10 {
 	//TODO: Delimiter should be passed into program as an option 
 	template< typename Stream, typename Matrix_data, typename Communicator>
-	bool read_csv( Stream & in, Matrix_data & data, const Communicator & world, char delimiter=','){
+	bool read_csv( Stream & in, Matrix_data & data, 
+		       const Communicator & world, char delimiter=','){
 		typedef typename Matrix_data::Matrix Matrix;
 		typedef typename std::pair<std::size_t, std::size_t> Block;
 
@@ -38,12 +51,16 @@ namespace t10 {
 		//Step 0: Get first line
 		std::getline(in, line);
 		std::size_t number_of_rows=1;
-		const std::size_t number_of_columns=std::count(line.begin(), line.end(), delimiter)+1;
+		const std::size_t number_of_columns=std::count(line.begin(), 
+							         line.end(), 
+							  	delimiter)+1;
 
 		//Step 1: Determine the number of lines in the file
 		//Also verify that it is well formatted.
 		while (std::getline(in, line)){
-			if(number_of_columns!=std::count(line.begin(), line.end(), delimiter)+1){
+			if(number_of_columns!= std::count(line.begin(), 
+							    line.end(), 
+							   delimiter)+1){
 				std::cerr << "CSV File is invalid" << std::endl;
 				return false;
 			}
@@ -54,37 +71,46 @@ namespace t10 {
 			return false;
 		}
 		data.n = number_of_rows;
-		//matrix is well formatted, now get the size of the blocks for each processor
+		//matrix is well formatted, now get the size of the 
+		//blocks for each processor
 		//1. calculate equally sized block sizes and remaining entries
 		const std::size_t num_proc = world.size();
-		// for now ignore the fact that number of processors is not perfect square
+		//for now ignore the fact that number of processors 
+		//is not perfect square
 		const std::size_t p = std::sqrt(world.size());
 		const std::size_t proc_id = world.rank();
 		const std::size_t avg_block_size = number_of_rows / p;
-		// row size of block before resizing
+		//row size of block before resizing
 		std::size_t block_size1 = avg_block_size;
-		// col size of block before resizing
+		//col size of block before resizing
 		std::size_t block_size2 = avg_block_size;
-		// number of left-over elements
+		//number of left-over elements
 		const std::size_t remaining = number_of_rows % p;
-		// row and column index of the block for this processor, from 0 to p-1, this is invariant
+		//row and column index of the block for this processor, 
+		//from 0 to p-1, this is invariant
 		Block block = id_to_index(proc_id, p);
 		
 		const std::size_t block_row = block.first;
 		const std::size_t block_col = block.second;
 		data.block_row = block_row;
 		data.block_col = block_col;
-		// if remaining was > 0, this block size increases by 1 if the block is within the first remaining x remaining 
-		// blocks, as we distribute remaining entries among the first submatrix of blocks
+		//if remaining was > 0, this block size increases by 1 if the 
+		//block is within the first remaining x remaining 
+		//blocks, as we distribute remaining entries among the first 
+		//submatrix of blocks
 
 		block_size1 += block_row < remaining;
 		block_size2 += block_col < remaining;
-		// number of lines to skip to get to this block, sum of the block sizes of the blocks "above" it
-		// add the lesser of remaining number of elements and block_row index, because that many remaining elements
-		// have been distributed to the blocks "above" it
-		const std::size_t first_row = block_row * avg_block_size + std::min(remaining, block_row);
+		//number of lines to skip to get to this block, sum of the block
+		//sizes of the blocks "above" it
+		//add the lesser of remaining number of elements and block_row 
+		//index, because that many remaining elements
+		//have been distributed to the blocks "above" it
+		const std::size_t first_row = block_row * avg_block_size + 
+						std::min(remaining, block_row);
 		// similarly for columns
-		const std::size_t first_col = block_col * avg_block_size + std::min(remaining, block_col);
+		const std::size_t first_col = block_col * avg_block_size + 
+						std::min(remaining, block_col);
 		data.first_row = first_row;
 		data.first_col = first_col;
 		data.last_row = first_row + block_size1;
@@ -97,16 +123,20 @@ namespace t10 {
 		//Step 3: Read The File!
 		//Go to Beginning...
 		//... then go to the first_row line
-		for(std::size_t i =0; i < first_row; ++i) { std::getline(in, line); }
-		for(std::size_t i =0; i < block_size1; ++i){
+		for(std::size_t i=0; i < first_row; ++i) { 
+			std::getline(in, line); 
+		}
+		for(std::size_t i=0; i < block_size1; ++i){
 			std::getline(in, line);
 			for (std::size_t j = 0; j < first_col; ++j){ 
-				const std::size_t found = line.find_first_of(delimeter);
+				const std::size_t found = 
+						line.find_first_of(delimiter);
 				line = line.substr( found+1);
 			}
 
 			for( std::size_t j = 0; j < block_size2; ++j){
-				const std::size_t found = line.find_first_of(delimeter);
+				const std::size_t found = 
+						line.find_first_of(delimiter);
 				M(i,j) = atof( line.substr(0, found).c_str());
 				line = line.substr( found+1);
 			}
@@ -127,7 +157,8 @@ namespace t10 {
 	template< typename String, typename Matrix, typename Communicator>
 	void read_matrix( const String & filename, Matrix & M, 
 			  const Communicator & world){
-		const std::string file_ext(filename.substr(filename.find_last_of(".") + 1));
+		const std::string file_ext( 
+			filename.substr( filename.find_last_of(".") + 1));
 		std::ifstream in(filename.c_str());
 		if (!in.good()){ 
 			std::cerr << "Error Opening " << filename  << std::endl;
@@ -136,17 +167,20 @@ namespace t10 {
 		//TODO: Error checking if file doesn't open.
 		if (file_ext == "csv") {
 			if (!read_csv( in, M, world)){
-				std::cerr << "Error Reading CSV file" << std::endl;
+				std::cerr << "Error Reading CSV file";
+				std::cerr << std::endl;
 				std::exit( -1);
 			}
 		} else if (file_ext == "mm") {
 			if (!read_mm( in, M, world)){
-				std::cerr << "Error Reading Matrix Market file" << std::endl;
+				std::cerr << "Error Reading Matrix Market file";
+				std::cerr << std::endl;
 				std::exit( -1);
 			}
 		} else if (file_ext == "mat") {
 			if (!read_mat( in, M, world)){
-				std::cerr << "Error Reading .Mat file" << std::endl;
+				std::cerr << "Error Reading .Mat file";
+				std::cerr << std::endl;
 				std::exit( -1);
 			}
 		} else {
@@ -219,9 +253,6 @@ namespace t10 {
 		
 		return str;
 	}
-
-
-
 	
 	template< typename Matrix>
 	std::string print_matrix( const Matrix & M, bool matlab){
@@ -247,7 +278,6 @@ namespace t10 {
 			str.replace(found,1,std::string(""));
 			found = str.find(std::string("("));
 		}
-
 
 		return str;	
 	}
