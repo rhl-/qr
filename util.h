@@ -53,13 +53,16 @@ namespace t10 {
 		Vector & p_col = data.p_col;
 		Vector & s_col = data.s_col;
 		
-		//communicators involved in right householder multiplication (nvolves partner col and own row)
+		//communicators involved in right householder multiplication 
+		//(nvolves partner col and own row)
 		Vector_comm & right_comm_vec = data.right_comm_vec;
 		//comm involved in left mult (needs own col and partner row)
 		Vector_comm & left_comm_vec = data.left_comm_vec;
-		//communicators along row of this processor (for propagating right multiplication)
+		//communicators along row of this processor 
+		//(for propagating right multiplication)
 		Vector_comm & row_comm_vec = data.row_comm_vec;
-		//communicators along col of this processor (for propagating left multiplication)
+		//communicators along col of this processor 
+		//(for propagating left multiplication)
 		Vector_comm & col_comm_vec = data.col_comm_vec;
 
 		ant.resize( anti_size, id);
@@ -75,8 +78,10 @@ namespace t10 {
 		//vector of all panels of communicators
 		Vector_comm all_panels(row_length);		
 		//loop over diag entries from 0 to p-1
-		diag = 0;
-		for (Iterator k = all_panels.begin(); k != all_panels.end(); ++k) {
+		for (Iterator k = all_panels.begin(); 
+			      k != all_panels.end(); ++k) {
+			const std::size_t diag = 
+					std::distance(all_panels.begin(), k);
 			Vector pan_j(2*(row_length-diag)-1, id);
 			Iterator end = pan_j.begin()+(row_length-diag);
                 	std::size_t a = diag;
@@ -88,10 +93,12 @@ namespace t10 {
                 	for(Iterator i = end; i != pan_j.end(); ++i){
                 	        *i = index_to_id(diag,++b, row_length);
         	        }
-			mpi::group pan_j_group = world.group().include( pan_j.begin(),
+			mpi::group pan_j_group = world.group().include( 
+								pan_j.begin(),
                                                                 pan_j.end());
-			++diag;
+			*k = mpi::communicator( world, pan_j_group);
 		}
+
 		//create panel indices
 		Iterator end = pan.begin()+(row_length-diag1);
 		std::size_t a = diag1;
