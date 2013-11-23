@@ -270,11 +270,13 @@ namespace t10 {
 				ublas::range r1(0,M.size1()/2);
 				ublas::range r2(0, M.size2());
 				ublas::matrix_range< Matrix> S(M, r1,r2);
+				//TODO: Fix serialization issues
 				//data.world.send(data.partner,0,S.data());
 			}
 			else{
 				M.resize(M.size1(),M.size2()/2);
-				//data.world.recv(data.partner,0,M.data()); 
+				//TODO: Fix serialization issues
+				//data.world.recv(data.partner,0,M); 
 			}
 		}
 	}
