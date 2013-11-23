@@ -144,15 +144,13 @@ namespace t10 {
 					 const Communicator & column_comm){
 		typedef typename Vector::value_type Value;
 		Value x = v[0];
+		#ifdef QR_HESSENBERG_DEBUG
+		std::cout << "Proc: " << column_comm.rank()
+			  << "Initial: " << v << std::endl;
+		#endif //QR_HESSENBERG_DEBUG
 		//root process should be zero, according to at least OpenMPI
 		//documentation
-		std::cout << "Proc: " << column_comm.rank() 
-			  << " of " << column_comm.size() 
-			  << "abt to bcast" 
-			  << std::endl;
 		mpi::broadcast( column_comm, x, 0);
-
-		/*
 		Value beta = 1.0;
 		const Value inner_prod = ublas::inner_prod(v,v);
 		Value sigma = 0;
@@ -166,10 +164,13 @@ namespace t10 {
 			beta = (2.0*y)/(y+sigma);
 			v /= x;
 		}
-		
+		if( column_comm.rank()==0){ v[0]=1.0; }
+		#ifdef QR_HESSENBERG_DEBUG
+		std::cout << "Proc: " << column_comm.rank()
+			  << "Beta: " << beta << std::endl  
+			  << v << std::endl;
+		#endif //QR_HESSENBERG_DEBUG
 		return beta;
-		*/
-		return 0;
 	}
 	
 	template< typename Vector, typename Matrix>
@@ -197,8 +198,7 @@ namespace t10 {
 				ublas::prod<Vector>(S,v), v);
 		}
 	}
-	
-	template< typename Data>
+	#ifdef QR_HESSENBERG_DEBUG
 	void print_elseif_debug(const Data & data, const std::size_t & col_idx, 
 					           const std::size_t & k){
 		std::cout << "Prc: " << data.world.rank()
@@ -208,6 +208,8 @@ namespace t10 {
 			  << data.n << " x " << data.n
 			  << std::endl;
 	}
+	#endif //QR_HESSENBERG_DEBUG
+
 	template< typename Matrix_data>
 	void hessenberg( Matrix_data & data){
 		typedef typename Matrix_data::Matrix Matrix;
@@ -230,37 +232,29 @@ namespace t10 {
 			}
 			else if(data.below() && k < data.last_col-1){ 
 				const std::size_t col_idx = k-data.first_col;
+				#ifdef QR_HESSENBERG_DEBUG
 				print_elseif_debug( data, col_idx, k);
+				#endif
 				Matrix_column col(M,col_idx);
 				std::size_t offset = data.diag(); 
 				Vector vs = ublas::subrange( col,
 							     col_idx+offset, 
 							     M.size1());
-				std::cout << "proc:(l_col) " << data.l_col_comm.rank()
-					  << "is: " << data.world.rank() << "(world)";
 				compute_householder_vector( vs, 
 							    data.l_col_comm);
-				std::cout << "Processor: " << data.world.rank()
-					  << " has computed: " 
-					  << print_vector(vs)
-					  << std::endl;	
 			}
 			//the last column of every block has a special case
 			else if( data.below() && !data.diag() 
 					&& k == data.last_col){
 				const std::size_t col_idx = k-data.first_col;
+				#ifdef QR_HESSENBERG_DEBUG
 				print_elseif_debug( data, col_idx,k);
+				#endif
 				Matrix_column col(M,M.size2()-1);
 				std::size_t offset =(data.s_col_comm.rank()==0);
 				Vector vs = ublas::subrange( col,col_idx+offset,
 							     M.size1());
-				std::cout << "proc:(s_col) " << data.s_col_comm.rank()
-					  << "is: " << data.world.rank() << "(world)";
 				compute_householder_vector(vs,data.s_col_comm);
-				std::cout << "Processor: " << data.world.rank()
-					  << " has computed: " 
-					  << print_vector(vs)
-					  << std::endl;	
 			}
 			else if( !data.diag() ){
 				ready_to_load_balance = true;
