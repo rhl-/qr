@@ -168,7 +168,7 @@ namespace t10 {
 		if( column_comm.rank()==0){ v[0]=1.0; }
 		#ifdef QR_HOUSE_DEBUG
 		std::cout << "Proc: " << column_comm.rank()
-			  << " Beta: " << beta << v << std::endl;
+			  << " Beta: " << beta << " " << v << std::endl;
 		#endif //QR_HOUSE_DEBUG
 		return beta;
 	}
