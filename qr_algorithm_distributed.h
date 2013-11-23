@@ -175,7 +175,7 @@ namespace t10 {
 	
 	template< typename Vector, typename Matrix>
 	void apply_householder_left( const typename Vector::value_type & beta, 
-				     const Vector & v, Matrix & M, ){
+				     const Vector & v, Matrix & M ){
 		/*
 		if (beta != 0){
 			Vector w = ublas::prod< Vector>(M,v);
@@ -220,12 +220,13 @@ namespace t10 {
 		//Algorithm 7.4.2 GVL
 		for (std::size_t k = 0; k < n-2; ++k){
 			if( k < data.first_col){
-				Value beta=0.0;
+			/*	Value beta=0.0;
 				Vector vs_left, vs_right;
 				mpi::broadcast( left_comm[ i], vs_left, root_left); 
 				mpi::broadcast( right_comm[ i], vs_right, root_right);
 				apply_householder_left( beta, vs_left, M, row_comm);
 				apply_householder_right( beta, vs_right, M, col_comm);
+			*/
 			}
 			else if(data.below() && k < data.last_col-1){ 
 				const std::size_t col_idx = k-data.first_col;
@@ -237,9 +238,10 @@ namespace t10 {
 				Vector vs = ublas::subrange( col,
 							     col_idx+offset, 
 							     M.size1());
-				const Value beta = compute_householder_vector( vs, 
-							    	data.l_col_comm);
-				mpi::broadcast()
+				const Value beta = 
+					compute_householder_vector( vs, 
+							    data.l_col_comm);
+			//	mpi::broadcast()
 					 
 			}
 			//the last column of every block has a special case
@@ -253,9 +255,10 @@ namespace t10 {
 				std::size_t offset =(data.s_col_comm.rank()==0);
 				Vector vs = ublas::subrange( col,col_idx+offset,
 							     M.size1());
-				const Value beta = compute_householder_vector(vs,data.s_col_comm);
+				const Value beta = 
+				compute_householder_vector(vs,data.s_col_comm);
 				//broadcast
-				mpi::broadcast()
+				//mpi::broadcast()
 			}
 			else if( !data.diag() ){
 				ready_to_load_balance = true;
@@ -263,7 +266,7 @@ namespace t10 {
 			}
 		}
 		if (ready_to_load_balance){
-			if(above()){
+			if(data.above()){
 				ublas::range r1(0,M.size1()/2);
 				ublas::range r2(0, M.size2());
 				ublas::matrix_range< Matrix> S(M, r1,r2);
