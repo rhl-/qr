@@ -1,5 +1,6 @@
 #ifndef QR_ALGORITHM_H
 #define QR_ALGORITHM_H
+#define QR_HOUSE_DEBUG
 #define QR_ITERATION_OUTPUT
 //#define DEBUG_QR_ITERATION //comment me out to turn off debug mode
 #include <boost/timer.hpp>
@@ -144,10 +145,10 @@ namespace t10 {
 					 const Communicator & column_comm){
 		typedef typename Vector::value_type Value;
 		Value x = v[0];
-		#ifdef QR_HESSENBERG_DEBUG
+		#ifdef QR_HOUSE_DEBUG
 		std::cout << "Proc: " << column_comm.rank()
-			  << "Initial: " << v << std::endl;
-		#endif //QR_HESSENBERG_DEBUG
+			  << " Initial: " << v << std::endl;
+		#endif //QR_HOUSE_DEBUG
 		//root process should be zero, according to at least OpenMPI
 		//documentation
 		mpi::broadcast( column_comm, x, 0);
@@ -165,11 +166,10 @@ namespace t10 {
 			v /= x;
 		}
 		if( column_comm.rank()==0){ v[0]=1.0; }
-		#ifdef QR_HESSENBERG_DEBUG
+		#ifdef QR_HOUSE_DEBUG
 		std::cout << "Proc: " << column_comm.rank()
-			  << "Beta: " << beta << std::endl  
-			  << v << std::endl;
-		#endif //QR_HESSENBERG_DEBUG
+			  << " Beta: " << beta << v << std::endl;
+		#endif //QR_HOUSE_DEBUG
 		return beta;
 	}
 	
@@ -260,8 +260,6 @@ namespace t10 {
 				ready_to_load_balance = true;
 				break;
 			}
-			//JUST FOR DEBUGGING
-			break;
 		}
 		if (ready_to_load_balance){
 			std::cout << "Processor: " << data.world.rank()
