@@ -175,28 +175,25 @@ namespace t10 {
 	
 	template< typename Vector, typename Matrix>
 	void apply_householder_left( const typename Vector::value_type & beta, 
-				     const Vector & v, Matrix & M, 
-				     const std::size_t k = 0){
+				     const Vector & v, Matrix & M, ){
+		/*
 		if (beta != 0){
-			ublas::range r1(k+1, M.size1());
-			ublas::range r2(k, M.size2());
-			ublas::matrix_range< Matrix> S(M, r1,r2);
-			S -= beta*ublas::outer_prod( v, 
-					ublas::prod<Vector>(ublas::trans(v),S));
-		}
+			Vector w = ublas::prod< Vector>(M,v);
+			mpi::all_reduce( col_comm, w, w, std::plus< Vector>()); 
+			M -= beta*ublas::outer_prod( v,w);
+		}*/
 	}
 
 	template< typename Vector, typename Matrix>
 	void apply_householder_right( const typename Vector::value_type & beta, 
 				      const Vector & v, 
 				      Matrix & M, const std::size_t k = 0){
+		/*
 		if (beta != 0){
-			ublas::range r1(0, M.size1());
-			ublas::range r2(k+1, M.size2());
-			ublas::matrix_range< Matrix> S(M, r1,r2);
-			S -= beta*ublas::outer_prod( 
-				ublas::prod<Vector>(S,v), v);
-		}
+			Vector w = ublas::prod<Vector>(M,v);
+			mpi::all_reduce( row_comm, w, w, std::plus< Vector>()); 
+			M -= beta*ublas::outer_prod( w, v);
+		}*/
 	}
 	#ifdef QR_HESSENBERG_DEBUG
 	void print_elseif_debug(const Data & data, const std::size_t & col_idx, 
@@ -223,12 +220,12 @@ namespace t10 {
 		//Algorithm 7.4.2 GVL
 		for (std::size_t k = 0; k < n-2; ++k){
 			if( k < data.first_col){
-				std::cout << "Processor: " << data.world.rank()
-				<< " would normally wait for work" << std::endl;
-				//TODO: MPI calls to receive vs and do work
-				//const Value beta=vs[0]; vs[0]=1;
-				//apply_householder_left( beta, vs, M, k);
-				//apply_householder_right( beta, vs, M, k);
+				Value beta=0.0;
+				Vector vs_left, vs_right;
+				mpi::broadcast( left_comm[ i], vs_left, root_left); 
+				mpi::broadcast( right_comm[ i], vs_right, root_right);
+				apply_householder_left( beta, vs_left, M, row_comm);
+				apply_householder_right( beta, vs_right, M, col_comm);
 			}
 			else if(data.below() && k < data.last_col-1){ 
 				const std::size_t col_idx = k-data.first_col;
@@ -240,8 +237,10 @@ namespace t10 {
 				Vector vs = ublas::subrange( col,
 							     col_idx+offset, 
 							     M.size1());
-				compute_householder_vector( vs, 
-							    data.l_col_comm);
+				const Value beta = compute_householder_vector( vs, 
+							    	data.l_col_comm);
+				mpi::broadcast()
+					 
 			}
 			//the last column of every block has a special case
 			else if( data.below() && !data.diag() 
@@ -254,7 +253,9 @@ namespace t10 {
 				std::size_t offset =(data.s_col_comm.rank()==0);
 				Vector vs = ublas::subrange( col,col_idx+offset,
 							     M.size1());
-				compute_householder_vector(vs,data.s_col_comm);
+				const Value beta = compute_householder_vector(vs,data.s_col_comm);
+				//broadcast
+				mpi::broadcast()
 			}
 			else if( !data.diag() ){
 				ready_to_load_balance = true;
@@ -262,11 +263,16 @@ namespace t10 {
 			}
 		}
 		if (ready_to_load_balance){
-			std::cout << "Processor: " << data.world.rank()
-				  << " Would normally load balance with"
-				  << " " << data.partner 
-				  << " after having done stuff" 
-				  << std::endl;
+			if(above()){
+				ublas::range r1(0,M.size1()/2);
+				ublas::range r2(0, M.size2());
+				ublas::matrix_range< Matrix> S(M, r1,r2);
+				world.send(data.partner,0,S);
+			}
+			else{
+				M.resize(M.size1(),M.size2()/2);
+				world.recv(data.partner,0,M); 
+			}
 		}
 	}
 
