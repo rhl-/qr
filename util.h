@@ -57,9 +57,9 @@ namespace t10 {
 		row.resize( row_length, id);
 		col.resize( row_length, id);
 		pan.resize( 2*(row_length-diag1)-1, id);
-		l_col.resize( row_length - r, id);
+		l_col.resize( row_length - diag1, id);
 		s_col.resize( l_col.size()-1, id);
-		r_row.resize( row_length - c, id);
+		r_row.resize( row_length - diag1, id);
 		p_row.resize( row_length, data.partner);
 		p_col.resize( row_length, data.partner);
 		
@@ -93,14 +93,14 @@ namespace t10 {
 		//create lower col indices
 		for (Iterator j = l_col.begin(); j != l_col.end(); ++j) {
 			const std::size_t dst = std::distance(l_col.begin(), j);
-			const std::size_t k = dst + r;
+			const std::size_t k = dst + diag1;
 			*j = k*row_length + c;
 		}
 
 		//create right row indices
 		for (Iterator i = r_row.begin(); i != r_row.end(); ++i) {
 			const std::size_t dst = std::distance(r_row.begin(), i);
-			const std::size_t k = dst + c;
+			const std::size_t k = dst + diag1;
 			*i = r*row_length + k;
 		}
 
