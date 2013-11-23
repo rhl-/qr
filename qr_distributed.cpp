@@ -44,6 +44,12 @@ int main( int argc, char * argv[]){
 	std::string filename( vm[ "input-file"].as< std::string>());
 	t10::read_matrix( filename, data);
 	t10::construct_communicators( data);
-
 	t10::qr( data);
+	bool done = false;
+	bool im_done = true;
+	mpi::reduce(data.world,im_done,done,mpi::bitwise_and<bool>(),0);
+	if (data.world.rank() == 0 && done){ 
+		std::cout << "Everyone is done, its time to shut down. buh bye"
+			  << std::endl;
+	}
 }

@@ -51,12 +51,14 @@ namespace t10 {
 		Vector & r_row = data.row;
 		Vector & p_row = data.p_row;
 		Vector & p_col = data.p_col;
+		Vector & s_col = data.s_col;
 
 		ant.resize( anti_size, id);
 		row.resize( row_length, id);
 		col.resize( row_length, id);
 		pan.resize( 2*(row_length-diag1)-1, id);
 		l_col.resize( row_length - r, id);
+		s_col.resize( l_col.size()-1, id);
 		r_row.resize( row_length - c, id);
 		p_row.resize( row_length, data.partner);
 		p_col.resize( row_length, data.partner);
@@ -119,7 +121,7 @@ namespace t10 {
 		std::sort (r_row.begin(), r_row.end()); 
 		std::sort (p_row.begin(), p_row.end()); 
 		std::sort (p_col.begin(), p_col.end());
- 
+		std::copy (l_col.begin()+1,l_col.end(),s_col.begin());
 		#ifdef UTIL_DEBUG
 			std::cout << "Processor: " << world.rank() <<  std::endl
 				  << "Partner: " << data.partner << std::endl
@@ -142,6 +144,8 @@ namespace t10 {
 								pan.end());
 		mpi::group l_col_group = world.group().include( l_col.begin(),
                                                                 l_col.end());
+		mpi::group s_col_group = world.group().include( s_col.begin(),
+                                                                s_col.end());
 		mpi::group r_row_group = world.group().include( r_row.begin(),
                                                                 r_row.end());
 		mpi::group p_col_group = world.group().include( p_col.begin(),
@@ -154,6 +158,7 @@ namespace t10 {
 		data.pan_comm = mpi::communicator(world, pan_group);
 		data.r_row_comm = mpi::communicator(world, r_row_group);
                 data.l_col_comm = mpi::communicator(world, l_col_group);
+                data.s_col_comm = mpi::communicator(world, s_col_group);
                 data.p_col_comm = mpi::communicator(world, p_col_group);
                 data.p_row_comm = mpi::communicator(world, p_row_group);
 
@@ -198,13 +203,15 @@ namespace t10 {
 
 	template<typename _Matrix, typename _Communicator>
 	struct Matrix_data {
+		typedef _Matrix Matrix;
+		typedef _Communicator Communicator;
 		typedef typename std::vector< std::size_t> Vector;
+
 		bool above() const { return block_row <= block_col;}
 		bool below() const { return block_col <= block_row;}
 		bool diag()  const { return block_row == block_col; }
+
 		//Internal Matrix Type
-		typedef _Matrix Matrix;
-		typedef _Communicator Communicator;
 		Matrix M;
 		//Overall matrix size
 		std::size_t n;
@@ -223,6 +230,8 @@ namespace t10 {
 		Vector pan;
 		// processor below
 		Vector l_col;
+		//sub column
+		Vector s_col;
 		// proc to the right of
 		Vector r_row;
 		// proc on partner proc row
@@ -239,6 +248,7 @@ namespace t10 {
 		_Communicator pan_comm;
 		_Communicator r_row_comm;
                 _Communicator l_col_comm;
+                _Communicator s_col_comm;
                 _Communicator p_row_comm;
                 _Communicator p_col_comm;
 	}; // struct Matrix_data

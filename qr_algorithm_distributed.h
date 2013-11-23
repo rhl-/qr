@@ -146,7 +146,13 @@ namespace t10 {
 		Value x = v[0];
 		//root process should be zero, according to at least OpenMPI
 		//documentation
+		std::cout << "Proc: " << column_comm.rank() 
+			  << " of " << column_comm.size() 
+			  << "abt to bcast" 
+			  << std::endl;
 		mpi::broadcast( column_comm, x, 0);
+
+		/*
 		Value beta = 1.0;
 		const Value inner_prod = ublas::inner_prod(v,v);
 		Value sigma = 0;
@@ -160,7 +166,10 @@ namespace t10 {
 			beta = (2.0*y)/(y+sigma);
 			v /= x;
 		}
+		
 		return beta;
+		*/
+		return 0;
 	}
 	
 	template< typename Vector, typename Matrix>
@@ -188,8 +197,17 @@ namespace t10 {
 				ublas::prod<Vector>(S,v), v);
 		}
 	}
-
 	
+	template< typename Data>
+	void print_elseif_debug(const Data & data, const std::size_t & col_idx, 
+					           const std::size_t & k){
+		std::cout << "Prc: " << data.world.rank()
+			  << " housev local column: " << col_idx << " of "
+			  << data.M.size1() << " x " << data.M.size2()
+			  << " this is global column " << k << " of " 
+			  << data.n << " x " << data.n
+			  << std::endl;
+	}
 	template< typename Matrix_data>
 	void hessenberg( Matrix_data & data){
 		typedef typename Matrix_data::Matrix Matrix;
@@ -201,8 +219,6 @@ namespace t10 {
 		const std::size_t & n = data.n;
 		bool ready_to_load_balance=false;
 		//Algorithm 7.4.2 GVL
-		std::cout << "Processor: " << data.world.rank()
-			  << " is in hessenberg()" << std::endl;
 		for (std::size_t k = 0; k < n-2; ++k){
 			if( k < data.first_col){
 				std::cout << "Processor: " << data.world.rank()
@@ -212,35 +228,46 @@ namespace t10 {
 				//apply_householder_left( beta, vs, M, k);
 				//apply_householder_right( beta, vs, M, k);
 			}
-			else if(data.below() && k < data.last_col){ 
+			else if(data.below() && k < data.last_col-1){ 
 				const std::size_t col_idx = k-data.first_col;
-				std::cout << "Processor: " << data.world.rank()
-				<< " housev local column: " << col_idx << " of "
-				<< M.size1() << " x " << M.size2()
-				<< std::endl << "\t\t\t"
-				<< " this is global column " << k << " of " 
-				<< n << " x " << n
-				<< std::endl
-				<< "indices: [" << col_idx << " , " 
-				<< M.size1() << " ]" 
-				<< std::endl;
+				print_elseif_debug( data, col_idx, k);
 				Matrix_column col(M,col_idx);
-				std::size_t offset = 
+				std::size_t offset = data.diag(); 
 				Vector vs = ublas::subrange( col,
 							     col_idx+offset, 
 							     M.size1());
-				//compute_householder_vector( vs, 
-				//			    data.l_col_comm);
+				std::cout << "proc:(l_col) " << data.l_col_comm.rank()
+					  << "is: " << data.world.rank() << "(world)";
+				compute_householder_vector( vs, 
+							    data.l_col_comm);
 				std::cout << "Processor: " << data.world.rank()
 					  << " has computed: " 
 					  << print_vector(vs)
 					  << std::endl;	
-				
 			}
-			else if( !data.diag() ){ 
+			//the last column of every block has a special case
+			else if( data.below() && !data.diag() 
+					&& k == data.last_col){
+				const std::size_t col_idx = k-data.first_col;
+				print_elseif_debug( data, col_idx,k);
+				Matrix_column col(M,M.size2()-1);
+				std::size_t offset =(data.s_col_comm.rank()==0);
+				Vector vs = ublas::subrange( col,col_idx+offset,
+							     M.size1());
+				std::cout << "proc:(s_col) " << data.s_col_comm.rank()
+					  << "is: " << data.world.rank() << "(world)";
+				compute_householder_vector(vs,data.s_col_comm);
+				std::cout << "Processor: " << data.world.rank()
+					  << " has computed: " 
+					  << print_vector(vs)
+					  << std::endl;	
+			}
+			else if( !data.diag() ){
 				ready_to_load_balance = true;
 				break;
 			}
+			//JUST FOR DEBUGGING
+			break;
 		}
 		if (ready_to_load_balance){
 			std::cout << "Processor: " << data.world.rank()
