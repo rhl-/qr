@@ -28,7 +28,10 @@ namespace t10 {
 		typedef typename Matrix_data::Communicator Communicator;
 		typedef typename std::vector< std::size_t> Vector;
 		typedef typename Vector::iterator Iterator;
+
 		typedef typename std::vector< Communicator> Vector_comm;	
+		typedef typename Vector_comm::iterator Comm_iterator;
+
 		const Communicator & world = data.world;
 
 		const std::size_t id = world.rank();
@@ -78,7 +81,7 @@ namespace t10 {
 		//vector of all panels of communicators
 		Vector_comm all_panels(row_length);		
 		//loop over diag entries from 0 to p-1
-		for (Iterator k = all_panels.begin(); 
+		for (Comm_iterator k = all_panels.begin(); 
 			      k != all_panels.end(); ++k) {
 			const std::size_t diag = 
 					std::distance(all_panels.begin(), k);
