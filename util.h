@@ -28,7 +28,7 @@ namespace t10 {
 		typedef typename Matrix_data::Communicator Communicator;
 		typedef typename std::vector< std::size_t> Vector;
 		typedef typename Vector::iterator Iterator;
-	
+		typedef typename std::vector< Communicator> Vector_comm;	
 		const Communicator & world = data.world;
 
 		const std::size_t id = world.rank();
@@ -52,6 +52,15 @@ namespace t10 {
 		Vector & p_row = data.p_row;
 		Vector & p_col = data.p_col;
 		Vector & s_col = data.s_col;
+		
+		//communicators involved in right householder multiplication (nvolves partner col and own row)
+		Vector_comm & right_comm_vec = data.right_comm_vec;
+		//comm involved in left mult (needs own col and partner row)
+		Vector_comm & left_comm_vec = data.left_comm_vec;
+		//communicators along row of this processor (for propagating right multiplication)
+		Vector_comm & row_comm_vec = data.row_comm_vec;
+		//communicators along col of this processor (for propagating left multiplication)
+		Vector_comm & col_comm_vec = data.col_comm_vec;
 
 		ant.resize( anti_size, id);
 		row.resize( row_length, id);
@@ -63,16 +72,36 @@ namespace t10 {
 		p_row.resize( row_length, data.partner);
 		p_col.resize( row_length, data.partner);
 		
+		//vector of all panels of communicators
+		Vector_comm all_panels(row_length);		
+		//loop over diag entries from 0 to p-1
+		diag = 0;
+		for (Iterator k = all_panels.begin(); k != all_panels.end(); ++k) {
+			Vector pan_j(2*(row_length-diag)-1, id);
+			Iterator end = pan_j.begin()+(row_length-diag);
+                	std::size_t a = diag;
+                	std::size_t b = diag;
+                	for (Iterator i = pan_j.begin(); i != end; ++i,++a){
+                        	*i = index_to_id(a,diag, row_length);
+                	}
+
+                	for(Iterator i = end; i != pan_j.end(); ++i){
+                	        *i = index_to_id(diag,++b, row_length);
+        	        }
+			mpi::group pan_j_group = world.group().include( pan_j.begin(),
+                                                                pan_j.end());
+			++diag;
+		}
 		//create panel indices
 		Iterator end = pan.begin()+(row_length-diag1);
 		std::size_t a = diag1;
 		std::size_t b = diag1;
 		for (Iterator i = pan.begin(); i != end; ++i,++a){
-				*i = index_to_id(a,diag1, row_length);
+			*i = index_to_id(a,diag1, row_length);
 		}
 
 		for(Iterator i = end; i != pan.end(); ++i){
-				*i = index_to_id(diag1,++b, row_length);
+			*i = index_to_id(diag1,++b, row_length);
 		}
 
 		//create row and column mpi group indices
@@ -206,6 +235,7 @@ namespace t10 {
 		typedef _Matrix Matrix;
 		typedef _Communicator Communicator;
 		typedef typename std::vector< std::size_t> Vector;
+		typedef typename std::vector< _Communicator> Vector_comm;
 
 		bool above() const { return block_row <= block_col;}
 		bool below() const { return block_col <= block_row;}
@@ -251,6 +281,10 @@ namespace t10 {
                 _Communicator s_col_comm;
                 _Communicator p_row_comm;
                 _Communicator p_col_comm;
+		Vector_comm right_comm_vec;
+		Vector_comm left_comm_vec;
+		Vector_comm col_comm_vec;
+		Vector_comm row_comm_vec;
 	}; // struct Matrix_data
 
 }//end namespace t10
