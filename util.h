@@ -22,6 +22,22 @@ namespace t10 {
         T index_to_id(const T & block_row, const T & block_col, const T & p) {
                 return block_row * p + block_col;
         }
+	//TODO: Non-exported functionality
+	template< typename Vector>
+	void create_panel_vector( Vector & panel, const std::size_t k, 
+						  const std::size_t row_length){
+		typedef typename Vector::iterator Iterator;
+		Iterator end = panel.begin()+(row_length-k);
+        	std::size_t a = k, b = k;
+        	for (Iterator i = panel.begin(); 
+			      i != end; ++i,++a){
+        		*i = index_to_id( a, k, row_length);
+        	}
+
+        	for(Iterator i = end; i != panel.end(); ++i){
+        	        *i = index_to_id( k, ++b, row_length);
+        	}
+	}
 
 	template< typename Matrix_data>
 	void construct_communicators( Matrix_data & data){
@@ -46,87 +62,27 @@ namespace t10 {
 		
 		data.partner = index_to_id( c,r,  row_length);
 
-		Vector & ant = data.ant;
-		Vector & row = data.row;
-		Vector & col = data.col;
-		Vector & pan = data.pan;
-		Vector & l_col = data.l_col;
-		Vector & r_row = data.row;
-		Vector & p_row = data.p_row;
-		Vector & p_col = data.p_col;
-		Vector & s_col = data.s_col;
+
+		Vector row( row_length, id);
+		Vector col( row_length, id);
+		Vector l_col( row_length - diag1, id);
+		Vector s_col( l_col.size()-1, id);
+		Vector r_row( row_length - diag1, id);
+		Vector p_row( row_length, data.partner);
+		Vector p_col( row_length, data.partner);
 		
-		//communicators involved in right householder multiplication 
-		//(nvolves partner col and own row)
-		Vector_comm & right_comm_vec = data.right_comm_vec;
-		//comm involved in left mult (needs own col and partner row)
-		Vector_comm & left_comm_vec = data.left_comm_vec;
-		//communicators along row of this processor 
-		//(for propagating right multiplication)
-		Vector_comm & row_comm_vec = data.row_comm_vec;
-		//communicators along col of this processor 
-		//(for propagating left multiplication)
-		Vector_comm & col_comm_vec = data.col_comm_vec;
-
-		ant.resize( anti_size, id);
-		row.resize( row_length, id);
-		col.resize( row_length, id);
-		pan.resize( 2*(row_length-diag1)-1, id);
-		l_col.resize( row_length - diag1, id);
-		s_col.resize( l_col.size()-1, id);
-		r_row.resize( row_length - diag1, id);
-		p_row.resize( row_length, data.partner);
-		p_col.resize( row_length, data.partner);
-		
-		//vector of all panels of communicators
-		Vector_comm all_panels(row_length);		
-		//loop over diag entries from 0 to p-1
-		for (Comm_iterator k = all_panels.begin(); 
-			      k != all_panels.end(); ++k) {
-			const std::size_t diag = 
-					std::distance(all_panels.begin(), k);
-			Vector pan_j(2*(row_length-diag)-1, id);
-			Iterator end = pan_j.begin()+(row_length-diag);
-                	std::size_t a = diag;
-                	std::size_t b = diag;
-                	for (Iterator i = pan_j.begin(); i != end; ++i,++a){
-                        	*i = index_to_id(a,diag, row_length);
-                	}
-
-                	for(Iterator i = end; i != pan_j.end(); ++i){
-                	        *i = index_to_id(diag,++b, row_length);
-        	        }
-			mpi::group pan_j_group = world.group().include( 
-								pan_j.begin(),
-                                                                pan_j.end());
-			*k = mpi::communicator( world, pan_j_group);
-		}
-
-		//create panel indices
-		Iterator end = pan.begin()+(row_length-diag1);
-		std::size_t a = diag1;
-		std::size_t b = diag1;
-		for (Iterator i = pan.begin(); i != end; ++i,++a){
-			*i = index_to_id(a,diag1, row_length);
-		}
-
-		for(Iterator i = end; i != pan.end(); ++i){
-			*i = index_to_id(diag1,++b, row_length);
-		}
 
 		//create row and column mpi group indices
+		//for proc and its partner
 		Iterator j = col.begin();
-		for(Iterator i = row.begin(); i != row.end(); ++i, ++j){
-			const std::size_t k = std::distance(row.begin(), i);
-			*i = r*row_length + k;
-			*j = k*row_length + c;
-		}
-
-
-		//create antidiagonal group indices
-		for (Iterator k = ant.begin(); k != ant.end(); ++k){
-		       const std::size_t i = std::distance(ant.begin(), k);
-			*k = index_to_id((r+c)-anti_m+i,anti_m-i, row_length);
+		Iterator k = p_col.begin();
+		Iterator l = p_row.begin();
+		for(Iterator i = row.begin(); i != row.end(); ++i, ++j,++k,++l){
+			const std::size_t idx = std::distance(row.begin(), i);
+			*i = r*row_length + idx;
+			*k = c*row_length + idx;
+			*j = idx*row_length + c;
+                        *l = idx*row_length + r;
 		}
 
 		//create lower col indices
@@ -143,44 +99,18 @@ namespace t10 {
 			*i = r*row_length + k;
 		}
 
-		//create partner proc col and row by observing that the only 
-		//difference is swapping c and r
-		j = p_col.begin();
-                for(Iterator i = p_row.begin(); i != p_row.end(); ++i, ++j){
-                        const std::size_t k = std::distance(p_row.begin(), i);
-                        *i = c*row_length + k;
-                        *j = k*row_length + r;
-                }
-
 		std::sort (row.begin(),   row.end()); 
 		std::sort (col.begin(),   col.end()); 
-		std::sort (ant.begin(),   ant.end()); 
-		std::sort (pan.begin(),   pan.end()); 
 		std::sort (l_col.begin(), l_col.end()); 
 		std::sort (r_row.begin(), r_row.end()); 
 		std::sort (p_row.begin(), p_row.end()); 
 		std::sort (p_col.begin(), p_col.end());
 		std::copy (l_col.begin()+1,l_col.end(),s_col.begin());
-		#ifdef UTIL_DEBUG
-			std::cout << "Processor: " << world.rank() <<  std::endl
-				  << "Partner: " << data.partner << std::endl
-				  << "row: " << row << std::endl 
-				  << "col: " << col << std::endl 
-				  << "ant: " << ant << std::endl
-				  << "pan: " << pan << std::endl 
-                                  << "Lower col: " << l_col << std::endl
-				  << "Right row: " << r_row << std::endl
-				  << "Partner row: " << p_row << std::endl
-				  << "Partner col: " << p_col << std::endl;
-		#endif
+		
 		mpi::group row_group = world.group().include( row.begin(), 
 								row.end());
 		mpi::group col_group = world.group().include( col.begin(), 
 								col.end());
-		mpi::group ant_group = world.group().include( ant.begin(), 
-								ant.end());
-		mpi::group pan_group = world.group().include( pan.begin(), 
-								pan.end());
 		mpi::group l_col_group = world.group().include( l_col.begin(),
                                                                 l_col.end());
 		mpi::group s_col_group = world.group().include( s_col.begin(),
@@ -191,53 +121,65 @@ namespace t10 {
                                                                 p_col.end());
 		mpi::group p_row_group = world.group().include( p_row.begin(),
                                                                 p_row.end());
-		data.row_comm = mpi::communicator(world, row_group);
-		data.col_comm = mpi::communicator(world, col_group);
-		data.ant_comm = mpi::communicator(world, ant_group);
-		data.pan_comm = mpi::communicator(world, pan_group);
 		data.r_row_comm = mpi::communicator(world, r_row_group);
                 data.l_col_comm = mpi::communicator(world, l_col_group);
                 data.s_col_comm = mpi::communicator(world, s_col_group);
                 data.p_col_comm = mpi::communicator(world, p_col_group);
                 data.p_row_comm = mpi::communicator(world, p_row_group);
 
-		#ifdef UTIL_DEBUG
-		std::cout << "Processor: " << world.rank() << " is " 
-			  << std::endl
-			  << data.row_comm.rank() << " of " 
-			  << data.row_comm.size() << " in row_comm" 
-			  << std::endl
-			  
-			  << data.col_comm.rank() << " of " 
-			  << data.col_comm.size() << " in col_comm" 
-			  << std::endl
- 			  
-			  << data.ant_comm.rank() << " of " 
-			  << data.ant_comm.size() << " in ant_comm" 
-			  << std::endl
+		//communicators involved in right householder multiplication 
+		//(nvolves partner col and own row)
+		Vector_comm  right_comm;
+		//comm involved in left mult (needs own col and partner row)
+		Vector_comm  left_comm;
+		//communicators along row of this processor 
+		//(for propagating right multiplication)
+		Vector_comm  row_comm;
+		//communicators along col of this processor 
+		//(for propagating left multiplication)
+		Vector_comm  col_comm;
 
-			  << data.pan_comm.rank() << " of " 
-			  << data.pan_comm.size() << " in pan_comm" 
-			  << std::endl
+
+		//first union these groups
+		mpi::group right_group = p_col_group | row_group;
+		mpi::group left_group = p_row_group | col_group;
+		mpi::group row_comm_group = row_group;
+		mpi::group col_comm_group = col_group;
+
+		//put them in the appropriate places
+		right_comm.push_back( mpi::communicator( world, right_group));
+		left_comm.push_back( mpi::communicator( world, left_group));
+		row_comm.push_back( mpi::communicator( world, row_comm_group));
+		left_comm.push_back( mpi::communicator( world, col_comm_group));
 		
-                          << data.l_col_comm.rank() << " of "
-                          << data.l_col_comm.size() << " in l_col_comm"
-                          << std::endl
+		//now moving down the "diagonal" remove stuff from each
+		//group making communicators	
+		Vector indices;
+		indices.reserve( row_length);
+		for (std::size_t k = 0; k < std::min(row_length-1,id); ++k) {
 
-                          << data.r_row_comm.rank() << " of "
-                          << data.r_row_comm.size() << " in r_row_comm"
-                          << std::endl
+			indices.push_back( k);
+			row_comm_group.exclude( indices.begin(), indices.end());
+			col_comm_group.exclude( indices.begin(), indices.end());
+			row_comm.push_back( mpi::communicator(  world, 
+							       row_comm_group));
+			left_comm.push_back( mpi::communicator( world, 
+							       col_comm_group));
 
-                          << data.p_col_comm.rank() << " of "
-                          << data.p_col_comm.size() << " in p_col_comm"
-                          << std::endl
-
-                          << data.p_row_comm.rank() << " of "
-                          << data.p_row_comm.size() << " in p_row_comm"
-                          << std::endl
-			  << "-------------------------" 
-			  << std::endl;
-		#endif
+			
+			Vector panel;
+			t10::create_panel_vector( panel, k, row_length);
+			mpi::group panel_group = world.group().include( 
+								panel.begin(),
+                                                                panel.end());
+			//set difference
+			left_group = left_group - panel_group;
+			right_group = right_group - panel_group;
+			right_comm.push_back( mpi::communicator( world, 
+								 right_group));
+			left_comm.push_back( mpi::communicator( world, 
+								left_group));
+		}
 	}
 
 	template<typename _Matrix, typename _Communicator>
@@ -264,37 +206,21 @@ namespace t10 {
 		std::size_t block_row;
 		std::size_t block_col;
 		std::size_t partner;		
-		Vector ant;
-		Vector row;
-		Vector col;
-		Vector pan;
-		// processor below
-		Vector l_col;
-		//sub column
-		Vector s_col;
-		// proc to the right of
-		Vector r_row;
-		// proc on partner proc row
-		Vector p_row;
-		// proc on partner proc col
-		Vector p_col;
+		
 		/*
  		* Below is a list of communicators
  		*/ 	
 		_Communicator world;
-		_Communicator row_comm;
-		_Communicator col_comm;
 		_Communicator ant_comm;
-		_Communicator pan_comm;
 		_Communicator r_row_comm;
                 _Communicator l_col_comm;
                 _Communicator s_col_comm;
                 _Communicator p_row_comm;
                 _Communicator p_col_comm;
-		Vector_comm right_comm_vec;
-		Vector_comm left_comm_vec;
-		Vector_comm col_comm_vec;
-		Vector_comm row_comm_vec;
+		Vector_comm right_comm;
+		Vector_comm left_comm;
+		Vector_comm col_comm;
+		Vector_comm row_comm;
 	}; // struct Matrix_data
 
 }//end namespace t10
