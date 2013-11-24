@@ -9,6 +9,8 @@
 #include <boost/numeric/ublas/matrix_proxy.hpp> //for slices
 #include <boost/numeric/ublas/vector_proxy.hpp> //for slices
 #include "io.h"
+#include "util.h"
+
 #ifdef DEBUG_QR_ITERATION
 #endif //endif DEBUG_QR_ITERATION
 namespace ublas = boost::numeric::ublas;
@@ -206,30 +208,83 @@ namespace t10 {
 			  << std::endl;
 	}
 	#endif //QR_HESSENBERG_DEBUG
+	template< typename Matrix_data, typename T>
+	std::pair< T, T> compute_roots(  const Matrix_data & data, 
+					const T & block_col){
+		const std::size_t lroot = index_to_id( data.block_row,block_col,
+						       data.row_length);
+		const std::size_t rroot = index_to_id( data.block_col,block_col,
+						       data.row_length);
+		return std::make_pair( lroot, rroot);
+	}
+
+	template< typename Matrix_data, typename T>
+	T get_right_rank( const Matrix_data & data, const T & block_col){
+		typedef typename Matrix_data::Map_vector::value_type Map;
+		typedef typename Map::const_iterator Iterator;
+		const Map & map = data.right_comm_map[ block_col];
+		Iterator pair = map.find( data.world.rank());
+		if (pair == map.end()){ 
+			std::cerr << "bug exists get_right_rank error" 
+			          << std::endl;
+			return 666; 
+		}
+		return pair->second; 
+	}
+
+	template< typename Matrix_data, typename T>
+	T get_left_rank( const Matrix_data & data, const T & block_col){
+		typedef typename Matrix_data::Map_vector::value_type Map;
+		typedef typename Map::const_iterator Iterator;
+		const Map & map = data.left_comm_map[ block_col];
+		Iterator pair = map.find( data.world.rank());
+		if (pair == map.end()){ 
+			std::cerr << "bug exists get_left_rank error" 
+			          << std::endl;
+			return 666; 
+		}
+		return pair->second; 
+	}
 
 	template< typename Matrix_data>
 	void hessenberg( Matrix_data & data){
+		typedef typename Matrix_data::Communicator Communicator;
 		typedef typename Matrix_data::Matrix Matrix;
 		typedef typename Matrix::value_type Value;
 		typedef typename ublas::matrix_column< Matrix> Matrix_column;
 		typedef typename ublas::vector< Value> Vector;
 		typedef typename ublas::vector_range< Vector> Vector_range;
+		typedef typename std::pair< std::size_t, std::size_t> Pair;
 		Matrix & M = data.M;
-		const std::size_t & n = data.n;
+		const std::size_t n = data.n;
+		const std::size_t id = data.world.rank();
+		const std::size_t blocks = std::sqrt( data.world.size());
 		bool ready_to_load_balance=false;
 		//Algorithm 7.4.2 GVL
 		for (std::size_t k = 0; k < n-2; ++k){
+			const std::size_t block_col = 
+			t10::block_column_index( k, blocks, n);
+			Communicator left_comm = data.left_comm[ block_col];
+			Communicator right_comm = data.right_comm[ block_col];
+			Pair root = compute_roots( data, block_col);
 			if( k < data.first_col){
 				Value beta=0.0;
-				Vector vs_left, vs_right;
+				Vector v_left, v_right;
+				//TODO: if possibly these should be Ibcast,
+				//then wait_some() and as data comes in we call
+				//the functions below
+				mpi::broadcast(left_comm,  v_left, root.first);
+				mpi::broadcast(right_comm, v_right,root.second);
+				std::cout << id << " v_left: " 
+					  << v_left << std::endl; 
+				std::cout << id << " v_right: " 
+					  << v_right << std::endl; 
 				/*
-				mpi::broadcast( left_comm[ i], vs_left, root_left);
-				mpi::broadcast( right_comm[ i],vs_right, root_right);
-				
 				apply_householder_left( beta, 
 							vs_left, M, row_comm);
 				apply_householder_right( beta, 
-							 vs_right, M, col_comm);*/
+							 vs_right, M, col_comm);
+				*/
 			}
 			else if(data.below() && k < data.last_col-1){ 
 				const std::size_t col_idx = k-data.first_col;
@@ -241,11 +296,13 @@ namespace t10 {
 				Vector vs = ublas::subrange( col,
 							     col_idx+offset, 
 							     M.size1());
-				const Value beta = 
-					compute_householder_vector( vs, 
-							    data.l_col_comm);
-			//	mpi::broadcast()
-					 
+				const Communicator & cc = data.l_col_comm;
+				Value beta = compute_householder_vector( vs,cc);
+				//TODO: attach beta to vs
+				const std::size_t right_rank = 
+					   get_right_rank( data, block_col);
+				mpi::broadcast( right_comm, vs, right_rank);
+				std::cout << id << " just send hv" << std::endl;
 			}
 			//the last column of every block has a special case
 			else if( data.below() && !data.diag() 
@@ -258,15 +315,21 @@ namespace t10 {
 				std::size_t offset =(data.s_col_comm.rank()==0);
 				Vector vs = ublas::subrange( col,col_idx+offset,
 							     M.size1());
-				const Value beta = 
-				compute_householder_vector(vs,data.s_col_comm);
-				//broadcast
-				//mpi::broadcast()
+
+				const Communicator & cc = data.s_col_comm;
+				Value beta = compute_householder_vector( vs,cc);
+				//TODO: attach beta to vs
+				const std::size_t right_rank = 
+					   get_right_rank( data, block_col);
+				mpi::broadcast( right_comm, vs, right_rank);
+				std::cout << id << " just send hv" << std::endl;
 			}
 			else if( !data.diag() ){
 				ready_to_load_balance = true;
 				break;
 			}
+			//JUST FOR DEBUGGING
+			break;
 		}
 		if (ready_to_load_balance){
 			if(data.above()){

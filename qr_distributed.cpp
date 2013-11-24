@@ -45,10 +45,5 @@ int main( int argc, char * argv[]){
 	std::string filename( vm[ "input-file"].as< std::string>());
 	t10::read_matrix( filename, data);
 	t10::construct_communicators( data);
-	/*
 	t10::qr( data);
-	*/
-		std::cout << data.world.rank() 
-			  << " Everyone is done, its time to shut down. buh bye"
-			  << std::endl;
 }

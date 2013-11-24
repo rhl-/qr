@@ -111,6 +111,7 @@ namespace t10 {
 		const std::size_t anti_size = 2*anti_m-(r+c) + 1;
 		
 		data.partner = index_to_id( c,r,  row_length);
+		data.row_length = row_length;
 
 		std::cout << id << " is here " << std::endl;
 		
@@ -189,7 +190,6 @@ namespace t10 {
 		left_comm.push_back( mpi::communicator( world, left_group));
 		row_comm.push_back( mpi::communicator( world, row_comm_group));
 		left_comm.push_back( mpi::communicator( world, col_comm_group));
-		
 
 		//now moving down the "diagonal" remove stuff from each
 		//group making communicators	
@@ -223,8 +223,6 @@ namespace t10 {
 			t10::build_map( ridx, wcidx, col_map);
 			data.right_comm_map.push_back( col_map);
 
-
-
 			row_comm.push_back( mpi::communicator( world, 
 							       row_comm_group));
 			left_comm.push_back( mpi::communicator( world, 
@@ -242,19 +240,22 @@ namespace t10 {
 								left_group));
 		}
 	}
-	std::size_t get_col_index(std::size_t k, std::size_t p, std::size_t number_of_rows) {
+
+	std::size_t block_column_index(std::size_t k, std::size_t p, 
+				  std::size_t number_of_rows) {
+		
 		const std::size_t avg_block_size = number_of_rows / p;
-		// number of entries left over as before, which is number of blocks of lager size
+		// number of entries left over as before, which is 
+		//number of blocks of lager size
 		const std::size_t remaining = number_of_rows % p;
 		// total number of columns which are within the larger blocks
 		const std::size_t total = (avg_block_size + 1)*remaining;
 		// check if k is within the first few larger blocks
+		//otherwise first offset it by that many (matrix) columns and 
+		//see how many blocks past the first "remaining" blocks is this 
+		//block
 		if (k < total) { return k / (avg_block_size + 1);}
-		// otherwise first offset it by that many (matrix) columns and see how many blocks past the first "remaining" blocks is this block
-		else {
-			const std::size_t x = k - total;
-			return x / avg_block_size + remaining;
-		}
+		return (k-total) / avg_block_size + remaining;
 	}
 
 	template<typename _Matrix, typename _Communicator>
@@ -283,7 +284,8 @@ namespace t10 {
 		std::size_t last_col;
 		std::size_t block_row;
 		std::size_t block_col;
-		std::size_t partner;		
+		std::size_t partner;
+		std::size_t row_length;
 		
 		/*
  		* Below is a list of communicators
