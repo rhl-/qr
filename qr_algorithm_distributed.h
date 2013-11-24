@@ -197,17 +197,7 @@ namespace t10 {
 			M -= beta*ublas::outer_prod( w, v);
 		}*/
 	}
-	#ifdef QR_HESSENBERG_DEBUG
-	void print_elseif_debug(const Data & data, const std::size_t & col_idx, 
-					           const std::size_t & k){
-		std::cout << "Prc: " << data.world.rank()
-			  << " housev local column: " << col_idx << " of "
-			  << data.M.size1() << " x " << data.M.size2()
-			  << " this is global column " << k << " of " 
-			  << data.n << " x " << data.n
-			  << std::endl;
-	}
-	#endif //QR_HESSENBERG_DEBUG
+	
 	template< typename Matrix_data, typename T>
 	std::pair< T, T> compute_roots(  const Matrix_data & data, 
 					const T & block_col){
@@ -288,9 +278,6 @@ namespace t10 {
 			}
 			else if(data.below() && k < data.last_col-1){ 
 				const std::size_t col_idx = k-data.first_col;
-				#ifdef QR_HESSENBERG_DEBUG
-				print_elseif_debug( data, col_idx, k);
-				#endif
 				Matrix_column col(M,col_idx);
 				std::size_t offset = data.diag(); 
 				Vector vs = ublas::subrange( col,
@@ -308,9 +295,7 @@ namespace t10 {
 			else if( data.below() && !data.diag() 
 					&& k == data.last_col){
 				const std::size_t col_idx = k-data.first_col;
-				#ifdef QR_HESSENBERG_DEBUG
-				print_elseif_debug( data, col_idx,k);
-				#endif
+		
 				Matrix_column col(M,M.size2()-1);
 				std::size_t offset =(data.s_col_comm.rank()==0);
 				Vector vs = ublas::subrange( col,col_idx+offset,

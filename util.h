@@ -142,7 +142,7 @@ namespace t10 {
 		std::copy( col.begin()+diag1, col.end(), l_col.begin());
 		std::copy( row.begin()+diag1, row.end(), r_row.begin());
 		std::copy (l_col.begin()+1,l_col.end(),s_col.begin());
-
+/*
 		std::cout << "id: " << id << std::endl 
 			  << "row: " << row << std::endl 
 			  << "col: "<< col << std::endl 
@@ -151,6 +151,7 @@ namespace t10 {
 			  << "lcol: " << l_col << std::endl 
 			  << "rrow: " << r_row << std::endl 
 			  << "scol: " << s_col << std::endl;
+*/
 
 		mpi::group row_group   = t10::create_group (world, row);
 		mpi::group col_group   = t10::create_group (world, col);
