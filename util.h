@@ -7,6 +7,17 @@
 #include "io.h"
 namespace mpi = boost::mpi;
 
+template< typename Stream, typename T>
+Stream& operator<<( Stream & out, const  std::vector< T> & v){
+	typedef typename std::vector< T> Vector;
+	typedef typename Vector::const_iterator Iterator;
+	for(Iterator i = v.begin(); i != v.end(); ++i){
+		out << *i;
+		if (i+1 != v.end()){ out << ", ";}
+	}
+	return out;
+}
+
 namespace t10 {
 
 	template< typename T>	
@@ -99,9 +110,11 @@ namespace t10 {
 		std::copy( row.begin()+diag1, row.end(), r_row.begin());
 		std::copy (l_col.begin()+1,l_col.end(),s_col.begin());
 
-		std::cout << id << row << std::endl << col << std::endl << p_row
-			  << std::endl << p_col << std::endl
-			  << l_col << std::endl << r_row << std::endl << s_col;
+		std::cout << "id: " << id << "row: " << row << std::endl 
+			  << "col: "<< col << std::endl << "prow: " << p_row
+			  << std::endl << "pcol: " << p_col << std::endl
+			  << "lcol: " << l_col << std::endl 
+			  << "rrow: " << r_row << std::endl << "scol: " << s_col;
 
 		mpi::group row_group   = t10::create_group (world, row);
 		mpi::group col_group   = t10::create_group (world, col);
@@ -211,6 +224,7 @@ namespace t10 {
                 _Communicator s_col_comm;
                 _Communicator p_row_comm;
                 _Communicator p_col_comm;
+
 		Vector_comm right_comm;
 		Vector_comm left_comm;
 		Vector_comm col_comm;

@@ -23,20 +23,6 @@
 namespace ublas = boost::numeric::ublas;
 namespace po = boost::program_options;
 
-
-//It is important that this is outside of a namespace.
-template< typename Stream, typename T>
-Stream& operator<<( Stream & out, const  std::vector< T> & v){
-	typedef typename std::vector< T> Vector;
-	typedef typename Vector::const_iterator Iterator;
-	for(Iterator i = v.begin(); i != v.end(); ++i){
-		out << *i;
-		if (i+1 != v.end()){ out << ", ";}
-	}
-	return out;
-}
-
-
 namespace t10 {
 	//TODO: Delimiter should be passed into program as an option 
 	template< typename Stream, typename Matrix_data>

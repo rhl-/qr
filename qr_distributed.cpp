@@ -48,11 +48,7 @@ int main( int argc, char * argv[]){
 	/*
 	t10::qr( data);
 	*/
-	bool done = false;
-	bool im_done = true;
-	mpi::reduce(data.world,im_done,done,mpi::bitwise_and<bool>(),0);
-	if (data.world.rank() == 0 && done){ 
-		std::cout << "Everyone is done, its time to shut down. buh bye"
+		std::cout << data.world.rank() 
+			  << " Everyone is done, its time to shut down. buh bye"
 			  << std::endl;
-	}
 }
