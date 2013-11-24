@@ -7,6 +7,11 @@
 namespace mpi = boost::mpi;
 namespace t10 {
 
+	template< typename Communicator, typename Vector> 
+	boost::mpi::group create_group( const Communicator & world, 
+						   const Vector & v){ 
+		return world.group().include(v.begin(), v.end()); 
+	}
 	template< typename T>
 	T row_id( const T & proc_id, const T & p){ return proc_id / p; }
 	
@@ -70,7 +75,6 @@ namespace t10 {
 		Vector r_row( row_length - diag1, id);
 		Vector p_row( row_length, data.partner);
 		Vector p_col( row_length, data.partner);
-		
 
 		//create row and column mpi group indices
 		//for proc and its partner
@@ -106,21 +110,15 @@ namespace t10 {
 		std::sort (p_row.begin(), p_row.end()); 
 		std::sort (p_col.begin(), p_col.end());
 		std::copy (l_col.begin()+1,l_col.end(),s_col.begin());
-		
-		mpi::group row_group = world.group().include( row.begin(), 
-								row.end());
-		mpi::group col_group = world.group().include( col.begin(), 
-								col.end());
-		mpi::group l_col_group = world.group().include( l_col.begin(),
-                                                                l_col.end());
-		mpi::group s_col_group = world.group().include( s_col.begin(),
-                                                                s_col.end());
-		mpi::group r_row_group = world.group().include( r_row.begin(),
-                                                                r_row.end());
-		mpi::group p_col_group = world.group().include( p_col.begin(),
-                                                                p_col.end());
-		mpi::group p_row_group = world.group().include( p_row.begin(),
-                                                                p_row.end());
+	
+		mpi::group row_group   = t10::create_group (world, row);
+		mpi::group col_group   = t10::create_group (world, col);
+		mpi::group l_col_group = t10::create_group (world, l_col);
+		mpi::group s_col_group = t10::create_group (world, s_col);
+		mpi::group r_row_group = t10::create_group (world, r_row);
+		mpi::group p_col_group = t10::create_group (world, p_col);
+		mpi::group p_row_group = t10::create_group (world, p_row);
+
 		data.r_row_comm = mpi::communicator(world, r_row_group);
                 data.l_col_comm = mpi::communicator(world, l_col_group);
                 data.s_col_comm = mpi::communicator(world, s_col_group);
@@ -129,16 +127,15 @@ namespace t10 {
 
 		//communicators involved in right householder multiplication 
 		//(nvolves partner col and own row)
-		Vector_comm  right_comm;
+		Vector_comm  & right_comm = data.right_comm;
 		//comm involved in left mult (needs own col and partner row)
-		Vector_comm  left_comm;
+		Vector_comm  & left_comm = data.left_comm;
 		//communicators along row of this processor 
 		//(for propagating right multiplication)
-		Vector_comm  row_comm;
+		Vector_comm  & row_comm = data.row_comm;
 		//communicators along col of this processor 
 		//(for propagating left multiplication)
-		Vector_comm  col_comm;
-
+		Vector_comm  & col_comm = data.col_comm;
 
 		//first union these groups
 		mpi::group right_group = p_col_group | row_group;
@@ -157,17 +154,15 @@ namespace t10 {
 		Vector indices;
 		indices.reserve( row_length);
 		for (std::size_t k = 0; k < std::min(row_length-1,id); ++k) {
-
 			indices.push_back( k);
 			row_comm_group.exclude( indices.begin(), indices.end());
 			col_comm_group.exclude( indices.begin(), indices.end());
-			row_comm.push_back( mpi::communicator(  world, 
+			row_comm.push_back( mpi::communicator( world, 
 							       row_comm_group));
 			left_comm.push_back( mpi::communicator( world, 
 							       col_comm_group));
-
 			
-			Vector panel;
+			Vector panel(2*(row_length-k)-1);
 			t10::create_panel_vector( panel, k, row_length);
 			mpi::group panel_group = world.group().include( 
 								panel.begin(),
