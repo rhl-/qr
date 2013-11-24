@@ -220,12 +220,17 @@ namespace t10 {
 		//Algorithm 7.4.2 GVL
 		for (std::size_t k = 0; k < n-2; ++k){
 			if( k < data.first_col){
-			/*	Value beta=0.0;
+			/*
+				Value beta=0.0;
 				Vector vs_left, vs_right;
-				mpi::broadcast( left_comm[ i], vs_left, root_left); 
-				mpi::broadcast( right_comm[ i], vs_right, root_right);
-				apply_householder_left( beta, vs_left, M, row_comm);
-				apply_householder_right( beta, vs_right, M, col_comm);
+				mpi::broadcast( left_comm[ i], 
+						vs_left, root_left); 
+				mpi::broadcast( right_comm[ i], 
+						vs_right, root_right);
+				apply_householder_left( beta, 
+							vs_left, M, row_comm);
+				apply_householder_right( beta, 
+							 vs_right, M, col_comm);
 			*/
 			}
 			else if(data.below() && k < data.last_col-1){ 

@@ -5,7 +5,34 @@
 #include <boost/mpi.hpp>
 #include <algorithm>
 namespace mpi = boost::mpi;
+
 namespace t10 {
+
+	template< typename T>	
+        std::pair<T, T> id_to_index(const T & proc_id, const T & p) {
+                return std::make_pair(proc_id / p, proc_id % p);
+        }
+
+	template< typename T>	
+        T index_to_id(const T & block_row, const T & block_col, const T & p) {
+                return block_row * p + block_col;
+        }
+
+	template< typename Vector>
+	void create_panel_vector( Vector & panel, const std::size_t k, 
+						  const std::size_t row_length){
+		typedef typename Vector::iterator Iterator;
+		Iterator end = panel.begin()+(row_length-k);
+		std::size_t a = k, b = k;
+		for (Iterator i = panel.begin(); 
+			      i != end; ++i,++a){
+			*i = t10::index_to_id( a, k, row_length);
+		}
+	
+		for(Iterator i = end; i != panel.end(); ++i){
+		        *i = t10::index_to_id( k, ++b, row_length);
+		}
+	}
 
 	template< typename Communicator, typename Vector> 
 	boost::mpi::group create_group( const Communicator & world, 
@@ -18,32 +45,6 @@ namespace t10 {
 	template< typename T>
 	T col_id( const T & proc_id, const T & p){ return proc_id % p; }
 	
-	template< typename T>	
-        std::pair<T, T> id_to_index(const T & proc_id, const T & p) {
-                return std::make_pair(proc_id / p, proc_id % p);
-        }
-
-	template< typename T>	
-        T index_to_id(const T & block_row, const T & block_col, const T & p) {
-                return block_row * p + block_col;
-        }
-	//TODO: Non-exported functionality
-	template< typename Vector>
-	void create_panel_vector( Vector & panel, const std::size_t k, 
-						  const std::size_t row_length){
-		typedef typename Vector::iterator Iterator;
-		Iterator end = panel.begin()+(row_length-k);
-        	std::size_t a = k, b = k;
-        	for (Iterator i = panel.begin(); 
-			      i != end; ++i,++a){
-        		*i = index_to_id( a, k, row_length);
-        	}
-
-        	for(Iterator i = end; i != panel.end(); ++i){
-        	        *i = index_to_id( k, ++b, row_length);
-        	}
-	}
-
 	template< typename Matrix_data>
 	void construct_communicators( Matrix_data & data){
 		typedef typename Matrix_data::Communicator Communicator;
@@ -163,7 +164,7 @@ namespace t10 {
 							       col_comm_group));
 			
 			Vector panel(2*(row_length-k)-1);
-			t10::create_panel_vector( panel, k, row_length);
+			create_panel_vector( panel, k, row_length);
 			mpi::group panel_group = world.group().include( 
 								panel.begin(),
                                                                 panel.end());
@@ -217,6 +218,17 @@ namespace t10 {
 		Vector_comm col_comm;
 		Vector_comm row_comm;
 	}; // struct Matrix_data
-
 }//end namespace t10
+
+
+
+
+
+
+
+
+
+
+
+
 #endif//T10_UTIL_H
