@@ -112,8 +112,6 @@ namespace t10 {
 		
 		data.partner = index_to_id( c,r,  row_length);
 		data.row_length = row_length;
-
-		std::cout << id << " is here " << std::endl;
 		
 		Vector row( row_length, id);
 		Vector col( row_length, id);
