@@ -1,9 +1,16 @@
 #ifndef T10_UTIL_H                                          
 #define T10_UTIL_H                                          
 //#define UTIL_DEBUG 
+
 //Boost MPI
 #include <boost/mpi.hpp>
+
+//Boost
+#include <boost/unordered_map.hpp>
+//STL
 #include <algorithm>
+#include <numeric>
+
 #include "io.h"
 namespace mpi = boost::mpi;
 
@@ -18,7 +25,17 @@ Stream& operator<<( Stream & out, const  std::vector< T> & v){
 	return out;
 }
 
+
 namespace t10 {
+
+	template <class ForwardIterator, class T>
+	void iota (ForwardIterator first, ForwardIterator last, T val){
+	  while (first!=last) {
+	    *first = val;
+	    ++first;
+	    ++val;
+	  }
+	}
 
 	template< typename T>	
         std::pair<T, T> id_to_index(const T & proc_id, const T & p) {
@@ -56,10 +73,25 @@ namespace t10 {
 	
 	template< typename T>
 	T col_id( const T & proc_id, const T & p){ return proc_id % p; }
-	
+
+	template< typename Vector, typename Map>
+	void build_map( const Vector & key, const Vector & value, Map & map){
+		typedef typename Vector::const_iterator Iterator;
+		if( key.size() != value.size()){ 
+			std::cerr << "build map error" << std::endl;
+			std::exit( -1);
+		}
+		//map.reserve(key.size());
+		Iterator j = value.begin();
+		for( Iterator i = key.begin(); i != key.end(); ++i, ++j){
+			map.insert( std::make_pair( *i, *j)); 
+		}
+	}	
 	template< typename Matrix_data>
 	void construct_communicators( Matrix_data & data){
 		typedef typename Matrix_data::Communicator Communicator;
+		typedef typename Matrix_data::Map_vector Map_vector;
+		typedef typename Map_vector::value_type Map;
 		typedef typename std::vector< std::size_t> Vector;
 		typedef typename Vector::iterator Iterator;
 
@@ -163,11 +195,36 @@ namespace t10 {
 		//group making communicators	
 		Vector indices;
 		indices.reserve( row_length);
+		data.right_comm_map.reserve( row_length);
+		data.left_comm_map.reserve( row_length);
 		for (std::size_t k = 0; k < row_length-1; ++k) {
 			indices.push_back( k);
 			row_comm_group.exclude( indices.begin(), indices.end());
 			col_comm_group.exclude( indices.begin(), indices.end());
+			Vector ridx(row_comm_group.size(),0);
+			Vector wridx( ridx);
+
+			Vector cidx(col_comm_group.size(),0);
+			Vector wcidx( cidx);
+			t10::iota( ridx.begin(), ridx.end(), 0);
 			
+			row_comm_group.translate_ranks( ridx.begin(), 
+							ridx.end(), 
+							world.group(), 
+							wridx.begin());
+			Map row_map;
+			t10::build_map( ridx, wridx, row_map);
+			data.right_comm_map.push_back( row_map);
+			col_comm_group.translate_ranks( cidx.begin(), 
+							cidx.end(), 
+							world.group(), 
+							wcidx.begin());
+			Map col_map;
+			t10::build_map( ridx, wcidx, col_map);
+			data.right_comm_map.push_back( col_map);
+
+
+
 			row_comm.push_back( mpi::communicator( world, 
 							       row_comm_group));
 			left_comm.push_back( mpi::communicator( world, 
@@ -190,6 +247,9 @@ namespace t10 {
 	struct Matrix_data {
 		typedef _Matrix Matrix;
 		typedef _Communicator Communicator;
+		typedef typename boost::unordered_map< std::size_t,
+						       std::size_t> Map;
+		typedef typename std::vector< Map> Map_vector;
 		typedef typename std::vector< std::size_t> Vector;
 		typedef typename std::vector< _Communicator> Vector_comm;
 
@@ -221,9 +281,11 @@ namespace t10 {
                 _Communicator s_col_comm;
                 _Communicator p_row_comm;
                 _Communicator p_col_comm;
-
+		
 		Vector_comm right_comm;
 		Vector_comm left_comm;
+		Map_vector right_comm_map;
+		Map_vector left_comm_map;
 		Vector_comm col_comm;
 		Vector_comm row_comm;
 	}; // struct Matrix_data
