@@ -207,29 +207,45 @@ namespace t10 {
 						       data.row_length);
 		return std::make_pair( lroot, rroot);
 	}
-
+	template<typename Map>
+	std::string print_map(const Map & map){
+		typedef typename Map::const_iterator Iterator;
+		std::stringstream ss;
+		ss << "{" << std::endl;
+		for(Iterator i = map.begin(); i != map.end(); ++i){
+			ss << i->first << " --> " << i->second << std::endl; 
+		}
+		ss << "}" << std::endl;
+		return ss.str();
+	}
 	template< typename Matrix_data, typename T>
-	T get_right_rank( const Matrix_data & data, const T & block_col){
+	bool get_right_rank( const Matrix_data & data, 
+			    const T & block_col, std::size_t & rank){
 		typedef typename Matrix_data::Map_vector::value_type Map;
 		typedef typename Map::const_iterator Iterator;
+		const std::size_t id = data.world.rank();
 		const Map & map = data.right_comm_map[ block_col];
+		std::cout << id << " rcms " << data.right_comm_map.size()
+			  << " map_size: " << map.size()
+			  << std::endl
+			  << print_map( map);
 		Iterator pair = map.find( data.world.rank());
-		if (pair == map.end()){ 
-			std::cerr << "bug exists get_right_rank error" 
-			          << std::endl;
-			return 666; 
+		if (pair == map.end()){
+			return false; 
 		}
-		return pair->second; 
+		rank = pair->second;
+		return true; 
 	}
 
 	template< typename Matrix_data, typename T>
 	T get_left_rank( const Matrix_data & data, const T & block_col){
 		typedef typename Matrix_data::Map_vector::value_type Map;
 		typedef typename Map::const_iterator Iterator;
+		const std::size_t id = data.world.rank();
 		const Map & map = data.left_comm_map[ block_col];
 		Iterator pair = map.find( data.world.rank());
 		if (pair == map.end()){ 
-			std::cerr << "bug exists get_left_rank error" 
+			std::cerr << id << " bug exists get_left_rank error" 
 			          << std::endl;
 			return 666; 
 		}
@@ -286,8 +302,15 @@ namespace t10 {
 				const Communicator & cc = data.l_col_comm;
 				Value beta = compute_householder_vector( vs,cc);
 				//TODO: attach beta to vs
-				const std::size_t right_rank = 
-					   get_right_rank( data, block_col);
+				std::size_t right_rank; 
+				if(!get_right_rank( data, block_col, 
+							  right_rank)){
+					std::cout << "k = " << k << std::endl
+						  << "id = " << id << std::endl
+						  << "block_col = " << block_col
+						  << std::endl;
+					std::exit( -1);
+				}
 				mpi::broadcast( right_comm, vs, right_rank);
 				std::cout << id << " just send hv" << std::endl;
 			}
@@ -304,8 +327,15 @@ namespace t10 {
 				const Communicator & cc = data.s_col_comm;
 				Value beta = compute_householder_vector( vs,cc);
 				//TODO: attach beta to vs
-				const std::size_t right_rank = 
-					   get_right_rank( data, block_col);
+				std::size_t right_rank; 
+				if(!get_right_rank( data, block_col, 
+							  right_rank)){
+					std::cout << "k = " << k << std::endl
+						  << "id = " << id << std::endl
+						  << "block_col = " << block_col
+						  << std::endl;
+					std::exit( -1);
+				}
 				mpi::broadcast( right_comm, vs, right_rank);
 				std::cout << id << " just send hv" << std::endl;
 			}

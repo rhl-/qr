@@ -214,14 +214,14 @@ namespace t10 {
 							world.group(), 
 							wridx.begin());
 			Map row_map;
-			t10::build_map( ridx, wridx, row_map);
+			t10::build_map( wridx, ridx, row_map);
 			data.right_comm_map.push_back( row_map);
 			col_comm_group.translate_ranks( cidx.begin(), 
 							cidx.end(), 
 							world.group(), 
 							wcidx.begin());
 			Map col_map;
-			t10::build_map( ridx, wcidx, col_map);
+			t10::build_map( wcidx,ridx, col_map);
 			data.right_comm_map.push_back( col_map);
 
 			row_comm.push_back( mpi::communicator( world, 
