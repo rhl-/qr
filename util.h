@@ -185,6 +185,20 @@ namespace t10 {
 								left_group));
 		}
 	}
+	std::size_t get_col_index(std::size_t k, std::size_t p, std::size_t number_of_rows) {
+		const std::size_t avg_block_size = number_of_rows / p;
+		// number of entries left over as before, which is number of blocks of lager size
+		const std::size_t remaining = number_of_rows % p;
+		// total number of columns which are within the larger blocks
+		const std::size_t total = (avg_block_size + 1)*remaining;
+		// check if k is within the first few larger blocks
+		if (k < total) { return k / (avg_block_size + 1);}
+		// otherwise first offset it by that many (matrix) columns and see how many blocks past the first "remaining" blocks is this block
+		else {
+			const std::size_t x = k - total;
+			return x / avg_block_size + remaining;
+		}
+	}
 
 	template<typename _Matrix, typename _Communicator>
 	struct Matrix_data {
