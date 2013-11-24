@@ -16,6 +16,7 @@
 #include <boost/mpi/communicator.hpp>
 
 //PROJECT
+#include "io.h"
 #include "qr_algorithm_distributed.h"
 #include "util.h"
 
@@ -44,7 +45,9 @@ int main( int argc, char * argv[]){
 	std::string filename( vm[ "input-file"].as< std::string>());
 	t10::read_matrix( filename, data);
 	t10::construct_communicators( data);
+	/*
 	t10::qr( data);
+	*/
 	bool done = false;
 	bool im_done = true;
 	mpi::reduce(data.world,im_done,done,mpi::bitwise_and<bool>(),0);

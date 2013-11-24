@@ -4,6 +4,7 @@
 //Boost MPI
 #include <boost/mpi.hpp>
 #include <algorithm>
+#include "io.h"
 namespace mpi = boost::mpi;
 
 namespace t10 {
@@ -68,7 +69,8 @@ namespace t10 {
 		
 		data.partner = index_to_id( c,r,  row_length);
 
-
+		std::cout << id << " is here " << std::endl;
+		
 		Vector row( row_length, id);
 		Vector col( row_length, id);
 		Vector l_col( row_length - diag1, id);
@@ -89,29 +91,18 @@ namespace t10 {
 			*j = idx*row_length + c;
                         *l = idx*row_length + r;
 		}
-
-		//create lower col indices
-		for (Iterator j = l_col.begin(); j != l_col.end(); ++j) {
-			const std::size_t dst = std::distance(l_col.begin(), j);
-			const std::size_t k = dst + diag1;
-			*j = k*row_length + c;
-		}
-
-		//create right row indices
-		for (Iterator i = r_row.begin(); i != r_row.end(); ++i) {
-			const std::size_t dst = std::distance(r_row.begin(), i);
-			const std::size_t k = dst + diag1;
-			*i = r*row_length + k;
-		}
-
 		std::sort (row.begin(),   row.end()); 
 		std::sort (col.begin(),   col.end()); 
-		std::sort (l_col.begin(), l_col.end()); 
-		std::sort (r_row.begin(), r_row.end()); 
 		std::sort (p_row.begin(), p_row.end()); 
 		std::sort (p_col.begin(), p_col.end());
+		std::copy( col.begin()+diag1, col.end(), l_col.begin());
+		std::copy( row.begin()+diag1, row.end(), r_row.begin());
 		std::copy (l_col.begin()+1,l_col.end(),s_col.begin());
-	
+
+		std::cout << id << row << std::endl << col << std::endl << p_row
+			  << std::endl << p_col << std::endl
+			  << l_col << std::endl << r_row << std::endl << s_col;
+
 		mpi::group row_group   = t10::create_group (world, row);
 		mpi::group col_group   = t10::create_group (world, col);
 		mpi::group l_col_group = t10::create_group (world, l_col);
@@ -125,6 +116,8 @@ namespace t10 {
                 data.s_col_comm = mpi::communicator(world, s_col_group);
                 data.p_col_comm = mpi::communicator(world, p_col_group);
                 data.p_row_comm = mpi::communicator(world, p_row_group);
+		
+		std::cout << id << " is col comm " << std::endl;
 
 		//communicators involved in right householder multiplication 
 		//(nvolves partner col and own row)
@@ -138,6 +131,8 @@ namespace t10 {
 		//(for propagating left multiplication)
 		Vector_comm  & col_comm = data.col_comm;
 
+		std::cout << id << " is group " << std::endl;
+
 		//first union these groups
 		mpi::group right_group = p_col_group | row_group;
 		mpi::group left_group = p_row_group | col_group;
@@ -150,6 +145,8 @@ namespace t10 {
 		row_comm.push_back( mpi::communicator( world, row_comm_group));
 		left_comm.push_back( mpi::communicator( world, col_comm_group));
 		
+		std::cout << id << " comms " << std::endl;
+
 		//now moving down the "diagonal" remove stuff from each
 		//group making communicators	
 		Vector indices;
@@ -176,6 +173,7 @@ namespace t10 {
 			left_comm.push_back( mpi::communicator( world, 
 								left_group));
 		}
+		std::cout << id << " loops " << std::endl;
 	}
 
 	template<typename _Matrix, typename _Communicator>
