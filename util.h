@@ -74,24 +74,6 @@ namespace t10 {
 	template< typename T>
 	T col_id( const T & proc_id, const T & p){ return proc_id % p; }
 
-	template< typename Communicator, typename Group, typename Map>
-	void build_map( const Communicator & world, 
-			Group & new_group, Map & map){
-		typedef typename std::vector< std::size_t> Vector;
-		typedef typename Vector::const_iterator Iterator;
-		Vector value(new_group.size(), 0);	
-		Vector key(new_group.size(), 0);	
-		t10::iota( value.begin(), value.end(), 0);
-		new_group.translate_ranks( value.begin(), 
-				       value.end(), 
-				       world.group(), 
-				       key.begin());
-		//map.reserve(key.size());
-		Iterator j = value.begin();
-		for( Iterator i = key.begin(); i != key.end(); ++i, ++j){
-			map.insert( std::make_pair( *i, *j)); 
-		}
-	}	
 	template< typename Matrix_data>
 	void construct_communicators( Matrix_data & data){
 		typedef typename Matrix_data::Communicator Communicator;
@@ -128,10 +110,11 @@ namespace t10 {
 
 		//create row and column mpi group indices
 		//for proc and its partner
-		Iterator j = col.begin();
-		Iterator k = p_col.begin();
-		Iterator l = p_row.begin();
-		for(Iterator i = row.begin(); i != row.end(); ++i, ++j,++k,++l){
+		for(Iterator i = row.begin(), 
+			     j = col.begin(),
+		             k = p_col.begin(), 
+			     l = p_row.begin(); i != row.end(); 
+			     ++i, ++j,++k,++l){
 			const std::size_t idx = std::distance(row.begin(), i);
 			*i = r*row_length + idx; //row
 			*l = c*row_length + idx; //partner col
@@ -171,11 +154,6 @@ namespace t10 {
                 data.p_row_comm = mpi::communicator(world, p_row_group);
 		
 
-		//communicators involved in right householder multiplication 
-		//(nvolves partner col and own row)
-		Vector_comm  & right_comm = data.right_comm;
-		//comm involved in left mult (needs own col and partner row)
-		Vector_comm  & left_comm = data.left_comm;
 		//communicators along row of this processor 
 		//(for propagating right multiplication)
 		Vector_comm  & row_comm = data.row_comm;
@@ -183,23 +161,8 @@ namespace t10 {
 		//(for propagating left multiplication)
 		Vector_comm  & col_comm = data.col_comm;
 
-		//first union these groups
-		mpi::group right_group = row_group | p_col_group;
-		mpi::group left_group =  col_group | p_row_group;
 		mpi::group row_comm_group = row_group;
 		mpi::group col_comm_group = col_group;
-
-		//then build maps for the left,right groups
-		Map init_left_map;
-		t10::build_map( world, left_group, init_left_map);
-		data.left_comm_map.push_back( init_left_map);
-		
-		Map init_right_map;
-		t10::build_map( world, right_group, init_right_map);
-		data.right_comm_map.push_back( init_right_map);
-
-		right_comm.push_back( mpi::communicator( world, right_group));
-		left_comm.push_back( mpi::communicator( world, left_group));
 
 		row_comm.push_back( mpi::communicator( world, row_comm_group));
 		col_comm.push_back( mpi::communicator( world, col_comm_group));
@@ -208,8 +171,6 @@ namespace t10 {
 		//group making communicators	
 		Vector indices;
 		indices.reserve( row_length);
-		data.right_comm_map.reserve( row_length);
-		data.left_comm_map.reserve( row_length);
 		for (std::size_t k = 0; k < row_length-1; ++k) {
 			indices.push_back( k);
 			/*begin row_comm_group_building*/
@@ -220,26 +181,6 @@ namespace t10 {
 							       row_comm_group));
 			col_comm.push_back( mpi::communicator( world, 
 							       col_comm_group));
-			Vector panel(2*(row_length-k)-1);
-			create_panel_vector( panel, k, row_length);
-			mpi::group panel_group = create_group( world, panel);
-			
-			//set difference
-			left_group = left_group - panel_group;
-			right_group = right_group - panel_group;
-			
-			Map left_map;
-			t10::build_map( world, left_group, left_map);
-			data.left_comm_map.push_back( left_map);
-
-			Map right_map;
-			t10::build_map( world, right_group, right_map);
-			data.right_comm_map.push_back( right_map);
-
-			right_comm.push_back( mpi::communicator( world, 
-								 right_group));
-			left_comm.push_back( mpi::communicator( world, 
-								left_group));
 		}
 	}
 
@@ -300,10 +241,6 @@ namespace t10 {
                 _Communicator p_row_comm;
                 _Communicator p_col_comm;
 		
-		Vector_comm right_comm;
-		Vector_comm left_comm;
-		Map_vector right_comm_map;
-		Map_vector left_comm_map;
 		Vector_comm col_comm;
 		Vector_comm row_comm;
 	}; // struct Matrix_data

@@ -189,68 +189,6 @@ namespace t10 {
 			M -= beta*ublas::outer_prod( w, v);
 		}*/
 	}
-	
-	template< typename Matrix_data, typename T>
-	std::pair< T, T> compute_roots(  const Matrix_data & data, 
-					const T & block_col){
-		const std::size_t lroot = index_to_id( data.block_row,block_col,
-						       data.row_length);
-		const std::size_t rroot = index_to_id( data.block_col,block_col,
-						       data.row_length);
-		return std::make_pair( lroot, rroot);
-	}
-	template<typename Map>
-	std::string print_map(const Map & map){
-		typedef typename Map::const_iterator Iterator;
-		std::stringstream ss;
-		ss << "{" << std::endl;
-		for(Iterator i = map.begin(); i != map.end(); ++i){
-			ss << i->first << " --> " << i->second << std::endl; 
-		}
-		ss << "}" << std::endl;
-		return ss.str();
-	}
-
-	template< typename Matrix_data, typename T>
-	bool get_right_rank( const Matrix_data & data, 
-			     const T & block_col, T & rank,
-			     const T & id){
-		typedef typename Matrix_data::Map_vector::value_type Map;
-		typedef typename Map::const_iterator Iterator;
-		const Map & map = data.right_comm_map[ block_col];
-		std::cout << id << " right_rank_map= "
-			  << print_map( map);
-		Iterator pair = map.find( id);
-		if (pair == map.end()){ return false; }
-		rank = pair->second;
-		return true; 
-	}
-	template< typename Matrix_data, typename T>
-	bool get_right_rank( const Matrix_data & data, 
-			     const T & block_col, T & rank){
-		return get_right_rank( data, block_col, rank, 
-					(T)data.world.rank());
-	}
-
-	template< typename Matrix_data, typename T>
-	bool get_left_rank( const Matrix_data & data, 
-			    const T & block_col, T & rank,
-			    const T & id){
-		typedef typename Matrix_data::Map_vector::value_type Map;
-		typedef typename Map::const_iterator Iterator;
-		const Map & map = data.left_comm_map[ block_col];
-		std::cout << id << " left_rank_map= " << print_map( map);
-		Iterator pair = map.find( id);
-		if (pair == map.end()){return false;}
-		rank = pair->second;
-		return true;
-	}
-	template< typename Matrix_data, typename T>
-	bool get_left_rank( const Matrix_data & data, 
-			     const T & block_col, T & rank){
-		return get_left_rank( data, block_col, rank, 
-					(T)data.world.rank());
-	}
 
 	template< typename Matrix_data>
 	void hessenberg( Matrix_data & data){
@@ -270,40 +208,21 @@ namespace t10 {
 		for (std::size_t k = 0; k < n-2; ++k){
 			const std::size_t block_col = 
 			t10::block_column_index( k, blocks, n);
-			Communicator left_comm = data.left_comm[ block_col];
-			Communicator right_comm = data.right_comm[ block_col];
-			Pair root = compute_roots( data, block_col);
+			Communicator row_comm = data.row_comm[ block_col];
+			Communicator col_comm = data.col_comm[ block_col];
+			std::cout << "row_comm: " << id << " ---> " 
+				  << row_comm.rank() << std::endl;
+			std::cout << "col_comm: " << id << " ---> " 
+				  << col_comm.rank() << std::endl;
+			const std::size_t col_root = data.block_col - block_col;
+			std::cout << "id: " << id << " col_root" 
+				  << col_root << std::endl;
 			if( k < data.first_col){
 				Value beta=0.0;
-				//TODO: if possibly these should be Ibcast,
-				//then wait_some() and as data comes in we call
-				//the functions below
-				std::cout << id << " broadcast receiving from: "
-					  << root.first << " and " 
-					  << root.second << std::endl;
-				std::size_t lroot=root.first, rroot=root.second;
-				if( !get_left_rank(data, block_col, lroot)){
-				       std::cout << "k = " << k << std::endl
-						  << "id = " << id << std::endl
-						  << "block_col = " << block_col
-						  << std::endl;
-					std::exit( -1);
-
-				}
-				if( !get_right_rank(data, block_col, rroot)){
-					std::cout << "k = " << k << std::endl
-						  << "id = " << id << std::endl
-						  << "block_col = " << block_col
-						  << std::endl;
-					std::exit( -1);
-
-				}
-				Vector v_left, v_right;
-				mpi::broadcast(left_comm,  v_left, lroot);
-				if (root.first != root.second){	
-					mpi::broadcast(right_comm, 
-						       v_right,rroot);
-				}
+				Vector v_left(M.size1(),0);
+				Vector v_right(M.size1(),0);
+				mpi::broadcast(row_comm,  v_left, 0);
+				//mpi::broadcast(col_comm,  v_right, col_root);
 				std::cout << id << " v_left: " 
 					  << v_left << std::endl; 
 				std::cout << id << " v_right: " 
@@ -316,52 +235,35 @@ namespace t10 {
 				*/
 			}
 			else if(data.below() && k < data.last_col-1){ 
-				const std::size_t col_idx = k-data.first_col;
-				Matrix_column col(M,col_idx);
-				std::size_t offset = data.diag(); 
-				Vector vs = ublas::subrange( col,
-							     col_idx+offset, 
-							     M.size1());
 				const Communicator & cc = data.l_col_comm;
-				Value beta = compute_householder_vector( vs,cc);
-				std::cout << id << " computed hv" << std::endl;
+				const std::size_t offset = data.diag(); 
+				const std::size_t col_idx = k-data.first_col;
+				const std::size_t row_idx = col_idx+offset;
+				const std::size_t rend = M.size1();
+				Matrix_column col(M, col_idx);
+				Vector v = ublas::subrange( col, row_idx, rend);
+				Value beta = compute_householder_vector( v,cc);
 				//TODO: attach beta to vs
-				std::size_t right_rank; 
-				if(!get_right_rank( data, block_col, 
-							  right_rank)){
-					std::cout << "k = " << k << std::endl
-						  << "id = " << id << std::endl
-						  << "block_col = " << block_col
-						  << std::endl;
-					std::exit( -1);
-				}
-				mpi::broadcast( right_comm, vs, right_rank);
-				std::cout << id << " just sent hv" << std::endl;
+				mpi::broadcast( row_comm, v, 0);
+				//Vector w(v);
+				//mpi::broadcast( cc, w, 0);
 			}
 			//the last column of every block has a special case
 			else if( data.below() && !data.diag() 
 					&& k == data.last_col){
-				const std::size_t col_idx = k-data.first_col;
-		
-				Matrix_column col(M,M.size2()-1);
-				std::size_t offset =(data.s_col_comm.rank()==0);
-				Vector vs = ublas::subrange( col,col_idx+offset,
-							     M.size1());
-
 				const Communicator & cc = data.s_col_comm;
-				Value beta = compute_householder_vector( vs,cc);
+				const std::size_t offset = (cc.rank()==0);
+				const std::size_t col_idx = M.size2()-1;
+				const std::size_t rend = M.size1();
+				const std::size_t row_idx = (rend-1)+offset;
+				Matrix_column col(M,col_idx);
+				Vector v = ublas::subrange( col,row_idx, rend);
+				Value beta = compute_householder_vector( v,cc);
 				//TODO: attach beta to vs
-				std::size_t right_rank; 
-				if(!get_right_rank( data, block_col, 
-							  right_rank)){
-					std::cout << "k = " << k << std::endl
-						  << "id = " << id << std::endl
-						  << "block_col = " << block_col
-						  << std::endl;
-					std::exit( -1);
-				}
-				mpi::broadcast( right_comm, vs, right_rank);
+				mpi::broadcast( row_comm, v, 0);
 				std::cout << id << " just send hv" << std::endl;
+				Vector w(v);
+				mpi::broadcast( cc, w, 0);
 			}
 			else if( !data.diag() ){
 				ready_to_load_balance = true;
@@ -381,7 +283,7 @@ namespace t10 {
 			else{
 				M.resize(M.size1(),M.size2()/2);
 				//TODO: Fix serialization issues
-				//data.world.recv(data.partner,0,M); 
+				//data.world.recv(data.partner,0,M.data()); 
 			}
 		}
 	}

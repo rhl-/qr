@@ -38,7 +38,8 @@ int main( int argc, char * argv[]){
 	//initialize mpi
 	mpi::environment env(argc, argv);
 	Matrix_data data;
-		
+	std::cout << env.processor_name() << " <----> " 
+		  << data.world.rank() << std::endl;
 	//read input
 	po::variables_map vm;
 	t10::process_args( argc, argv, vm);
