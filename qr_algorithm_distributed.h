@@ -210,33 +210,46 @@ namespace t10 {
 		ss << "}" << std::endl;
 		return ss.str();
 	}
+
 	template< typename Matrix_data, typename T>
 	bool get_right_rank( const Matrix_data & data, 
-			     const T & block_col, std::size_t & rank){
+			     const T & block_col, T & rank,
+			     const T & id){
 		typedef typename Matrix_data::Map_vector::value_type Map;
 		typedef typename Map::const_iterator Iterator;
-		const std::size_t id = data.world.rank();
 		const Map & map = data.right_comm_map[ block_col];
-		std::cout << id 
+		std::cout << id << " right_rank_map= "
 			  << print_map( map);
-		Iterator pair = map.find( data.world.rank());
+		Iterator pair = map.find( id);
 		if (pair == map.end()){ return false; }
 		rank = pair->second;
 		return true; 
 	}
+	template< typename Matrix_data, typename T>
+	bool get_right_rank( const Matrix_data & data, 
+			     const T & block_col, T & rank){
+		return get_right_rank( data, block_col, rank, 
+					(T)data.world.rank());
+	}
 
 	template< typename Matrix_data, typename T>
 	bool get_left_rank( const Matrix_data & data, 
-			    const T & block_col, std::size_t & rank){
+			    const T & block_col, T & rank,
+			    const T & id){
 		typedef typename Matrix_data::Map_vector::value_type Map;
 		typedef typename Map::const_iterator Iterator;
-		const std::size_t id = data.world.rank();
 		const Map & map = data.left_comm_map[ block_col];
-		std::cout << id << print_map( map);
-		Iterator pair = map.find( data.world.rank());
+		std::cout << id << " left_rank_map= " << print_map( map);
+		Iterator pair = map.find( id);
 		if (pair == map.end()){return false;}
 		rank = pair->second;
 		return true;
+	}
+	template< typename Matrix_data, typename T>
+	bool get_left_rank( const Matrix_data & data, 
+			     const T & block_col, T & rank){
+		return get_left_rank( data, block_col, rank, 
+					(T)data.world.rank());
 	}
 
 	template< typename Matrix_data>
@@ -262,14 +275,13 @@ namespace t10 {
 			Pair root = compute_roots( data, block_col);
 			if( k < data.first_col){
 				Value beta=0.0;
-				Vector v_left, v_right;
 				//TODO: if possibly these should be Ibcast,
 				//then wait_some() and as data comes in we call
 				//the functions below
 				std::cout << id << " broadcast receiving from: "
 					  << root.first << " and " 
 					  << root.second << std::endl;
-				std::size_t lroot, rroot; 
+				std::size_t lroot=root.first, rroot=root.second;
 				if( !get_left_rank(data, block_col, lroot)){
 				       std::cout << "k = " << k << std::endl
 						  << "id = " << id << std::endl
@@ -286,8 +298,12 @@ namespace t10 {
 					std::exit( -1);
 
 				}
+				Vector v_left, v_right;
 				mpi::broadcast(left_comm,  v_left, lroot);
-				mpi::broadcast(right_comm, v_right,rroot);
+				if (root.first != root.second){	
+					mpi::broadcast(right_comm, 
+						       v_right,rroot);
+				}
 				std::cout << id << " v_left: " 
 					  << v_left << std::endl; 
 				std::cout << id << " v_right: " 
