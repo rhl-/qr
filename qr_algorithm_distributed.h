@@ -208,8 +208,8 @@ namespace t10 {
 		for (std::size_t k = 0; k < n-2; ++k){
 			const std::size_t block_col = 
 			t10::block_column_index( k, blocks, n);
-			Communicator row_comm = data.row_comm[ block_col];
-			Communicator col_comm = data.col_comm[ block_col];
+			const Communicator& row_comm = data.row_comm[block_col];
+			const Communicator& col_comm = data.col_comm[block_col];
 			std::cout << "row_comm: " << id << " ---> " 
 				  << row_comm.rank() << std::endl;
 			std::cout << "col_comm: " << id << " ---> " 
@@ -220,12 +220,19 @@ namespace t10 {
 			if( k < data.first_col){
 				Value beta=0.0;
 				Vector v_left(M.size1(),0);
-				Vector v_right(M.size1(),0);
 				mpi::broadcast(row_comm,  v_left, 0);
-				//mpi::broadcast(col_comm,  v_right, col_root);
-				std::cout << id << " v_left: " 
-					  << v_left << std::endl; 
-				std::cout << id << " v_right: " 
+				std::cout << row_comm.rank() 
+					  << " (" << id << ")"
+					  <<  " v_left: " 
+					  << v_left << std::endl
+					  << "about to bcast from: " << col_root
+					  << std::endl;
+				Vector v_right(v_left);
+				v_right.resize(M.size1(),M.size1()==M.size2());
+				mpi::broadcast(col_comm,  v_right, col_root);
+				std::cout << row_comm.rank() 
+					  << " (" << id << ")"
+					  << " v_right: " 
 					  << v_right << std::endl; 
 				/*
 				apply_householder_left( beta, 
@@ -244,9 +251,22 @@ namespace t10 {
 				Vector v = ublas::subrange( col, row_idx, rend);
 				Value beta = compute_householder_vector( v,cc);
 				//TODO: attach beta to vs
+				std::cout << row_comm.rank() << " (" << id << ")"
+					  << " computed " << v << std::endl 
+					  << " and will now bcast" << std::endl;
 				mpi::broadcast( row_comm, v, 0);
-				//Vector w(v);
-				//mpi::broadcast( cc, w, 0);
+				std::cout << row_comm.rank() << " (" << id << ")"
+					  << " recieved v from local 0 " 
+					  << std::endl 
+					  << v << std::endl 
+					  << " about to bcast for col" 
+					  << std::endl;
+				Vector w(v);
+				mpi::broadcast( cc, w, 0);
+				std::cout << cc.rank() << " (" << id << ")" 
+					  << " recieved w from local 0 " 
+					  << std::endl 
+					  << w << std::endl; 
 			}
 			//the last column of every block has a special case
 			else if( data.below() && !data.diag() 

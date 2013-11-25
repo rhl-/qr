@@ -47,4 +47,5 @@ int main( int argc, char * argv[]){
 	t10::read_matrix( filename, data);
 	t10::construct_communicators( data);
 	t10::qr( data);
+	std::cout << " did that error occur yet?  " << std::endl << std::flush;
 }
