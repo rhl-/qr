@@ -38,14 +38,18 @@ int main( int argc, char * argv[]){
 	//initialize mpi
 	mpi::environment env(argc, argv);
 	Matrix_data data;
+	std::stringstream fname;
+	fname << "out." << data.world.rank();
+	std::ofstream out( fname.str().c_str());
+	std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
 	std::cout << env.processor_name() << " <----> " 
-		  << data.world.rank() << std::endl;
+		  << data.world.rank() << std::flush << std::endl;
 	//read input
 	po::variables_map vm;
 	t10::process_args( argc, argv, vm);
 	std::string filename( vm[ "input-file"].as< std::string>());
 	t10::read_matrix( filename, data);
 	t10::construct_communicators( data);
-	t10::qr( data);
+	//t10::qr( data);
 	std::cout << " did that error occur yet?  " << std::endl << std::flush;
 }

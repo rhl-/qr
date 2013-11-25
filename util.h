@@ -104,16 +104,14 @@ namespace t10 {
 		Vector col( row_length, id);
 		Vector p_row( row_length, data.partner);
 		Vector p_col( row_length, data.partner);
-		Vector l_col( row_length - diag1, id);
-		Vector r_row( row_length - diag1, id);
-		Vector s_col( l_col.size()-1, id);
 
 		//create row and column mpi group indices
 		//for proc and its partner
 		for(Iterator i = row.begin(), 
 			     j = col.begin(),
 		             k = p_col.begin(), 
-			     l = p_row.begin(); i != row.end(); 
+			     l = p_row.begin(); 
+			     i != row.end(); 
 			     ++i, ++j,++k,++l){
 			const std::size_t idx = std::distance(row.begin(), i);
 			*i = r*row_length + idx; //row
@@ -125,35 +123,18 @@ namespace t10 {
 		std::sort (col.begin(),   col.end()); 
 		std::sort (p_row.begin(), p_row.end()); 
 		std::sort (p_col.begin(), p_col.end());
-		std::copy( col.begin()+diag1, col.end(), l_col.begin());
-		std::copy( row.begin()+diag1, row.end(), r_row.begin());
-		std::copy (l_col.begin()+1,l_col.end(),s_col.begin());
-/*
 		std::cout << "id: " << id << std::endl 
 			  << "row: " << row << std::endl 
 			  << "col: "<< col << std::endl 
 			  << "prow: " << p_row << std::endl 
-			  << "pcol: " << p_col << std::endl
-			  << "lcol: " << l_col << std::endl 
-			  << "rrow: " << r_row << std::endl 
-			  << "scol: " << s_col << std::endl;
-*/
-
-		mpi::group row_group   = t10::create_group (world, row);
-		mpi::group col_group   = t10::create_group (world, col);
-		mpi::group l_col_group = t10::create_group (world, l_col);
-		mpi::group s_col_group = t10::create_group (world, s_col);
-		mpi::group r_row_group = t10::create_group (world, r_row);
-		mpi::group p_col_group = t10::create_group (world, p_col);
-		mpi::group p_row_group = t10::create_group (world, p_row);
+			  << "pcol: " << p_col << std::endl;
 		
-		data.r_row_comm = mpi::communicator(world, r_row_group);
-                data.l_col_comm = mpi::communicator(world, l_col_group);
-                data.s_col_comm = mpi::communicator(world, s_col_group);
+		mpi::group p_col_group = t10::create_group (world, p_col);
                 data.p_col_comm = mpi::communicator(world, p_col_group);
+		
+		mpi::group p_row_group = t10::create_group (world, p_row);
                 data.p_row_comm = mpi::communicator(world, p_row_group);
 		
-
 		//communicators along row of this processor 
 		//(for propagating right multiplication)
 		Vector_comm  & row_comm = data.row_comm;
@@ -161,27 +142,22 @@ namespace t10 {
 		//(for propagating left multiplication)
 		Vector_comm  & col_comm = data.col_comm;
 
-		mpi::group row_comm_group = row_group;
-		mpi::group col_comm_group = col_group;
-
-		row_comm.push_back( mpi::communicator( world, row_comm_group));
-		col_comm.push_back( mpi::communicator( world, col_comm_group));
-
 		//now moving down the "diagonal" remove stuff from each
 		//group making communicators	
-		Vector indices;
-		indices.reserve( row_length);
-		for (std::size_t k = 0; k < row_length-1; ++k) {
-			indices.push_back( k);
-			/*begin row_comm_group_building*/
-			row_comm_group.exclude( indices.begin(), indices.end());
-			col_comm_group.exclude( indices.begin(), indices.end());
-		
-			row_comm.push_back( mpi::communicator( world, 
-							       row_comm_group));
-			col_comm.push_back( mpi::communicator( world, 
-							       col_comm_group));
+		for (std::size_t k = 0; k <= data.block_col; ++k) {
+		    Vector srow( row.begin()+k, row.end());
+		    std::cout << id <<   "srow: " << srow << std::endl;
+		    mpi::group row_group = t10::create_group(world, srow);
+		    row_comm.push_back( mpi::communicator( world, row_group));
 		}
+ 
+		for (std::size_t k = 0; k <= data.block_row; ++k) {
+		    Vector scol( col.begin()+k, col.end()); 
+		    std::cout << id <<  "scol: " << scol << std::endl;
+		    mpi::group col_group = t10::create_group(world, scol);
+		    col_comm.push_back( mpi::communicator( world, col_group));
+		}
+		std::cout << id << " done with construct_comms" << std::endl;
 	}
 
 	std::size_t block_column_index(std::size_t k, std::size_t p, 
@@ -235,9 +211,6 @@ namespace t10 {
  		*/ 	
 		_Communicator world;
 		_Communicator ant_comm;
-		_Communicator r_row_comm;
-                _Communicator l_col_comm;
-                _Communicator s_col_comm;
                 _Communicator p_row_comm;
                 _Communicator p_col_comm;
 		

@@ -242,7 +242,7 @@ namespace t10 {
 				*/
 			}
 			else if(data.below() && k < data.last_col-1){ 
-				const Communicator & cc = data.l_col_comm;
+				const Communicator & cc = col_comm;
 				const std::size_t offset = data.diag(); 
 				const std::size_t col_idx = k-data.first_col;
 				const std::size_t row_idx = col_idx+offset;
@@ -271,7 +271,8 @@ namespace t10 {
 			//the last column of every block has a special case
 			else if( data.below() && !data.diag() 
 					&& k == data.last_col){
-				const Communicator & cc = data.s_col_comm;
+				const std::size_t cidx = data.block_col + 1;
+				const Communicator & cc = data.col_comm[ cidx];
 				const std::size_t offset = (cc.rank()==0);
 				const std::size_t col_idx = M.size2()-1;
 				const std::size_t rend = M.size1();
