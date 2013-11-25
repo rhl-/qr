@@ -210,13 +210,7 @@ namespace t10 {
 			t10::block_column_index( k, blocks, n);
 			const Communicator& row_comm = data.row_comm[block_col];
 			const Communicator& col_comm = data.col_comm[block_col];
-			std::cout << "row_comm: " << id << " ---> " 
-				  << row_comm.rank() << std::endl;
-			std::cout << "col_comm: " << id << " ---> " 
-				  << col_comm.rank() << std::endl;
 			const std::size_t col_root = data.block_col - block_col;
-			std::cout << "id: " << id << " col_root" 
-				  << col_root << std::endl;
 			if( k < data.first_col){
 				Value beta=0.0;
 				Vector v_left(M.size1(),0);
@@ -285,6 +279,9 @@ namespace t10 {
 				std::cout << id << " just send hv" << std::endl;
 				Vector w(v);
 				mpi::broadcast( cc, w, 0);
+			} else if( data.diag() && 
+				   data.block_col == block_col && 
+				   block_col == data.row_length-1){
 			}
 			else if( !data.diag() ){
 				ready_to_load_balance = true;

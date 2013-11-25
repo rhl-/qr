@@ -92,48 +92,22 @@ namespace t10 {
 		const std::size_t row_length = std::sqrt(world_size);
 		const std::size_t r = row_id( id, row_length);
 		const std::size_t c = col_id( id, row_length);
-		const std::size_t diag1 = std::min(r,c);
-		const std::size_t diag2 = std::max(r,c);
-		const std::size_t anti_m = std::min(r+c, row_length-1);
-		const std::size_t anti_size = 2*anti_m-(r+c) + 1;
 		
 		data.partner = index_to_id( c,r,  row_length);
 		data.row_length = row_length;
 		
 		Vector row( row_length, id);
 		Vector col( row_length, id);
-		Vector p_row( row_length, data.partner);
-		Vector p_col( row_length, data.partner);
-
 		//create row and column mpi group indices
 		//for proc and its partner
-		for(Iterator i = row.begin(), 
-			     j = col.begin(),
-		             k = p_col.begin(), 
-			     l = p_row.begin(); 
-			     i != row.end(); 
-			     ++i, ++j,++k,++l){
+		for(Iterator i = row.begin(), j = col.begin(); 
+			     i != row.end(); ++i, ++j){
 			const std::size_t idx = std::distance(row.begin(), i);
 			*i = r*row_length + idx; //row
-			*l = c*row_length + idx; //partner col
 			*j = idx*row_length + c; //col 
-                        *k = idx*row_length + r; //parter row
 		}
 		std::sort (row.begin(),   row.end()); 
 		std::sort (col.begin(),   col.end()); 
-		std::sort (p_row.begin(), p_row.end()); 
-		std::sort (p_col.begin(), p_col.end());
-		std::cout << "id: " << id << std::endl 
-			  << "row: " << row << std::endl 
-			  << "col: "<< col << std::endl 
-			  << "prow: " << p_row << std::endl 
-			  << "pcol: " << p_col << std::endl;
-		
-		mpi::group p_col_group = t10::create_group (world, p_col);
-                data.p_col_comm = mpi::communicator(world, p_col_group);
-		
-		mpi::group p_row_group = t10::create_group (world, p_row);
-                data.p_row_comm = mpi::communicator(world, p_row_group);
 		
 		//communicators along row of this processor 
 		//(for propagating right multiplication)
@@ -144,20 +118,18 @@ namespace t10 {
 
 		//now moving down the "diagonal" remove stuff from each
 		//group making communicators	
-		for (std::size_t k = 0; k <= data.block_col; ++k) {
+		const std::size_t one = 1;
+		for (std::size_t k = 0; k < std::max(data.block_col,one); ++k) {
 		    Vector srow( row.begin()+k, row.end());
-		    std::cout << id <<   "srow: " << srow << std::endl;
 		    mpi::group row_group = t10::create_group(world, srow);
 		    row_comm.push_back( mpi::communicator( world, row_group));
 		}
- 
-		for (std::size_t k = 0; k <= data.block_row; ++k) {
+ 		
+		for (std::size_t k = 0; k < std::max(data.block_row,one); ++k) {
 		    Vector scol( col.begin()+k, col.end()); 
-		    std::cout << id <<  "scol: " << scol << std::endl;
 		    mpi::group col_group = t10::create_group(world, scol);
 		    col_comm.push_back( mpi::communicator( world, col_group));
 		}
-		std::cout << id << " done with construct_comms" << std::endl;
 	}
 
 	std::size_t block_column_index(std::size_t k, std::size_t p, 
@@ -211,8 +183,6 @@ namespace t10 {
  		*/ 	
 		_Communicator world;
 		_Communicator ant_comm;
-                _Communicator p_row_comm;
-                _Communicator p_col_comm;
 		
 		Vector_comm col_comm;
 		Vector_comm row_comm;
