@@ -147,10 +147,6 @@ namespace t10 {
 					 const Communicator & column_comm){
 		typedef typename Vector::value_type Value;
 		Value x = v[0];
-		#ifdef QR_HOUSE_DEBUG
-		std::cout << "Proc: " << column_comm.rank()
-			  << " Initial: " << v << std::endl;
-		#endif //QR_HOUSE_DEBUG
 		//root process should be zero, according to at least OpenMPI
 		//documentation
 		mpi::broadcast( column_comm, x, 0);
@@ -168,10 +164,6 @@ namespace t10 {
 			v /= x;
 		}
 		if( column_comm.rank()==0){ v[0]=1.0; }
-		#ifdef QR_HOUSE_DEBUG
-		std::cout << "Proc: " << column_comm.rank()
-			  << " Beta: " << beta << " " << v << std::endl;
-		#endif //QR_HOUSE_DEBUG
 		return beta;
 	}
 	
@@ -220,36 +212,31 @@ namespace t10 {
 	}
 	template< typename Matrix_data, typename T>
 	bool get_right_rank( const Matrix_data & data, 
-			    const T & block_col, std::size_t & rank){
+			     const T & block_col, std::size_t & rank){
 		typedef typename Matrix_data::Map_vector::value_type Map;
 		typedef typename Map::const_iterator Iterator;
 		const std::size_t id = data.world.rank();
 		const Map & map = data.right_comm_map[ block_col];
-		std::cout << id << " rcms " << data.right_comm_map.size()
-			  << " map_size: " << map.size()
-			  << std::endl
+		std::cout << id 
 			  << print_map( map);
 		Iterator pair = map.find( data.world.rank());
-		if (pair == map.end()){
-			return false; 
-		}
+		if (pair == map.end()){ return false; }
 		rank = pair->second;
 		return true; 
 	}
 
 	template< typename Matrix_data, typename T>
-	T get_left_rank( const Matrix_data & data, const T & block_col){
+	bool get_left_rank( const Matrix_data & data, 
+			    const T & block_col, std::size_t & rank){
 		typedef typename Matrix_data::Map_vector::value_type Map;
 		typedef typename Map::const_iterator Iterator;
 		const std::size_t id = data.world.rank();
 		const Map & map = data.left_comm_map[ block_col];
+		std::cout << id << print_map( map);
 		Iterator pair = map.find( data.world.rank());
-		if (pair == map.end()){ 
-			std::cerr << id << " bug exists get_left_rank error" 
-			          << std::endl;
-			return 666; 
-		}
-		return pair->second; 
+		if (pair == map.end()){return false;}
+		rank = pair->second;
+		return true;
 	}
 
 	template< typename Matrix_data>
@@ -279,8 +266,28 @@ namespace t10 {
 				//TODO: if possibly these should be Ibcast,
 				//then wait_some() and as data comes in we call
 				//the functions below
-				mpi::broadcast(left_comm,  v_left, root.first);
-				mpi::broadcast(right_comm, v_right,root.second);
+				std::cout << id << " broadcast receiving from: "
+					  << root.first << " and " 
+					  << root.second << std::endl;
+				std::size_t lroot, rroot; 
+				if( !get_left_rank(data, block_col, lroot)){
+				       std::cout << "k = " << k << std::endl
+						  << "id = " << id << std::endl
+						  << "block_col = " << block_col
+						  << std::endl;
+					std::exit( -1);
+
+				}
+				if( !get_right_rank(data, block_col, rroot)){
+					std::cout << "k = " << k << std::endl
+						  << "id = " << id << std::endl
+						  << "block_col = " << block_col
+						  << std::endl;
+					std::exit( -1);
+
+				}
+				mpi::broadcast(left_comm,  v_left, lroot);
+				mpi::broadcast(right_comm, v_right,rroot);
 				std::cout << id << " v_left: " 
 					  << v_left << std::endl; 
 				std::cout << id << " v_right: " 
@@ -301,6 +308,7 @@ namespace t10 {
 							     M.size1());
 				const Communicator & cc = data.l_col_comm;
 				Value beta = compute_householder_vector( vs,cc);
+				std::cout << id << " computed hv" << std::endl;
 				//TODO: attach beta to vs
 				std::size_t right_rank; 
 				if(!get_right_rank( data, block_col, 
@@ -312,7 +320,7 @@ namespace t10 {
 					std::exit( -1);
 				}
 				mpi::broadcast( right_comm, vs, right_rank);
-				std::cout << id << " just send hv" << std::endl;
+				std::cout << id << " just sent hv" << std::endl;
 			}
 			//the last column of every block has a special case
 			else if( data.below() && !data.diag() 

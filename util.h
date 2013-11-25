@@ -74,13 +74,18 @@ namespace t10 {
 	template< typename T>
 	T col_id( const T & proc_id, const T & p){ return proc_id % p; }
 
-	template< typename Vector, typename Map>
-	void build_map( const Vector & key, const Vector & value, Map & map){
+	template< typename Communicator, typename Group, typename Map>
+	void build_map( const Communicator & world, 
+			Group & new_group, Map & map){
+		typedef typename std::vector< std::size_t> Vector;
 		typedef typename Vector::const_iterator Iterator;
-		if( key.size() != value.size()){ 
-			std::cerr << "build map error" << std::endl;
-			std::exit( -1);
-		}
+		Vector value(new_group.size(), 0);	
+		Vector key(new_group.size(), 0);	
+		t10::iota( value.begin(), value.end(), 0);
+		new_group.translate_ranks( value.begin(), 
+				       value.end(), 
+				       world.group(), 
+				       key.begin());
 		//map.reserve(key.size());
 		Iterator j = value.begin();
 		for( Iterator i = key.begin(); i != key.end(); ++i, ++j){
@@ -179,16 +184,25 @@ namespace t10 {
 		Vector_comm  & col_comm = data.col_comm;
 
 		//first union these groups
-		mpi::group right_group = p_col_group | row_group;
-		mpi::group left_group = p_row_group | col_group;
+		mpi::group right_group = row_group | p_col_group;
+		mpi::group left_group =  col_group | p_row_group;
 		mpi::group row_comm_group = row_group;
 		mpi::group col_comm_group = col_group;
 
-		//put them in the appropriate places
+		//then build maps for the left,right groups
+		Map init_left_map;
+		t10::build_map( world, left_group, init_left_map);
+		data.left_comm_map.push_back( init_left_map);
+		
+		Map init_right_map;
+		t10::build_map( world, right_group, init_right_map);
+		data.right_comm_map.push_back( init_right_map);
+
 		right_comm.push_back( mpi::communicator( world, right_group));
 		left_comm.push_back( mpi::communicator( world, left_group));
+
 		row_comm.push_back( mpi::communicator( world, row_comm_group));
-		left_comm.push_back( mpi::communicator( world, col_comm_group));
+		col_comm.push_back( mpi::communicator( world, col_comm_group));
 
 		//now moving down the "diagonal" remove stuff from each
 		//group making communicators	
@@ -198,33 +212,13 @@ namespace t10 {
 		data.left_comm_map.reserve( row_length);
 		for (std::size_t k = 0; k < row_length-1; ++k) {
 			indices.push_back( k);
+			/*begin row_comm_group_building*/
 			row_comm_group.exclude( indices.begin(), indices.end());
 			col_comm_group.exclude( indices.begin(), indices.end());
-			Vector ridx(row_comm_group.size(),0);
-			Vector wridx( ridx);
-
-			Vector cidx(col_comm_group.size(),0);
-			Vector wcidx( cidx);
-			t10::iota( ridx.begin(), ridx.end(), 0);
-			
-			row_comm_group.translate_ranks( ridx.begin(), 
-							ridx.end(), 
-							world.group(), 
-							wridx.begin());
-			Map row_map;
-			t10::build_map( wridx, ridx, row_map);
-			data.right_comm_map.push_back( row_map);
-			col_comm_group.translate_ranks( cidx.begin(), 
-							cidx.end(), 
-							world.group(), 
-							wcidx.begin());
-			Map col_map;
-			t10::build_map( wcidx,ridx, col_map);
-			data.right_comm_map.push_back( col_map);
-
+		
 			row_comm.push_back( mpi::communicator( world, 
 							       row_comm_group));
-			left_comm.push_back( mpi::communicator( world, 
+			col_comm.push_back( mpi::communicator( world, 
 							       col_comm_group));
 			Vector panel(2*(row_length-k)-1);
 			create_panel_vector( panel, k, row_length);
@@ -233,6 +227,15 @@ namespace t10 {
 			//set difference
 			left_group = left_group - panel_group;
 			right_group = right_group - panel_group;
+			
+			Map left_map;
+			t10::build_map( world, left_group, left_map);
+			data.left_comm_map.push_back( left_map);
+
+			Map right_map;
+			t10::build_map( world, right_group, right_map);
+			data.right_comm_map.push_back( right_map);
+
 			right_comm.push_back( mpi::communicator( world, 
 								 right_group));
 			left_comm.push_back( mpi::communicator( world, 
