@@ -1,19 +1,15 @@
-#ifndef QR_ALGORITHM_H
-#define QR_ALGORITHM_H
-#define QR_ITERATION_OUTPUT
-//#define DEBUG_QR_ITERATION //comment me out to turn off debug mode
+#ifndef QR_SERIAL_H
+#define QR_SERIAL_H
 #include <boost/timer.hpp>
 #include <boost/numeric/ublas/banded.hpp> //for banded_adaptor
 #include <boost/numeric/ublas/matrix.hpp> //for slices
 #include <boost/numeric/ublas/matrix_proxy.hpp> //for slices
 #include <boost/numeric/ublas/vector_proxy.hpp> //for slices
 #include "io.h"
-#ifdef DEBUG_QR_ITERATION
-#endif //endif DEBUG_QR_ITERATION
 namespace ublas = boost::numeric::ublas;
 
 namespace t10 {
-	namespace serial{
+	namespace serial {
 	//GVL Section 5.1.9
 	template< typename Value>
 	void compute_givens(const Value & a, const Value & b, Value & c, Value & s){
@@ -218,4 +214,4 @@ namespace t10 {
 	}
 } //end namespace serial
 } //end namespace t10
-#endif //QR_ALGORITHM_H
+#endif //QR_SERIAL_H

@@ -1,6 +1,5 @@
-#ifndef QR_ALGORITHM_H
-#define QR_ALGORITHM_H
-#define QR_HOUSE_DEBUG
+#ifndef QR_DISTRIBUTED_H
+#define QR_DISTRIBUTED_H
 #define QR_ITERATION_OUTPUT
 
 //BOOST MPI
@@ -143,7 +142,10 @@ namespace t10 {
 		} while( std::fabs(H(n-1,n-2)) > tol);
 		
 	}
-	
+	template< typename Communicator, typename String>
+	void debug_comm( const Communicator & c, const String & s){
+		if( !c) { std::cerr << s << std::endl; }
+	}
 	template< typename Vector, typename Communicator>
 	typename Vector::value_type compute_householder_vector( Vector & v, 
 					 const Communicator & column_comm){
@@ -195,15 +197,22 @@ namespace t10 {
 	typedef typename Matrix_data::Matrix Matrix; 
 	typedef typename Matrix::value_type Value;
 	typedef typename ublas::vector< Value> Vector;
-	const std::size_t block_col = t10::block_column_index( k, data.row_length, data.n);
+	typedef typename std::pair< Value, Vector> Pair;
+	const std::size_t block_col = block_column_index( k, data.row_length, 
+								      data.n);
 	const std::size_t col_root = data.block_col - block_col;
 	Matrix & M = data.M;
 	Value beta = 0.0;
-	Vector v_left( M.size1(), 0);
-	mpi::broadcast( data.row_comm[ block_col],  v_left, 0);
-	Vector v_right(v_left);
-	v_right.resize(M.size1(), M.size1()==M.size2());
-	mpi::broadcast(data.col_comm[ block_col],  v_right, col_root);
+	//Technically more space than we need
+	Vector v_left( M.size1()+1, 0);
+	if( k != data.last_row -1){
+		debug_comm( data.row_comm[ block_col], "receiver row_comm");
+		mpi::broadcast( data.row_comm[ block_col], v_left, 0);
+	}
+	Vector v_right( v_left);
+	v_right.resize( M.size1()+1, M.size1()==M.size2());
+	debug_comm( data.col_comm[ block_col], "receiver col_comm");
+	mpi::broadcast( data.col_comm[ block_col],  v_right, col_root);
 	/*
 	apply_householder_left( beta, 
 				vs_left, M, row_comm);
@@ -219,21 +228,22 @@ namespace t10 {
 	     typedef typename ublas::vector< Value> Vector;
 	     
 	     Matrix & M = data.M;
-	     const bool no_diag_needed = (k == data.last_col-1);
-	     const bool on_penultimate_col = (data.block_col == data.row_length-2);
-	     const std::size_t offset = on_penultimate_col;
+	     const bool on_last_col = (k == data.last_col-1);
+	     const bool penult_blck_col = (data.block_col == data.row_length-2);
 	     const std::size_t column_index = k - data.first_col; 
 	     Matrix_column col(M, column_index);
 	     Vector v( col);
 	     Value beta;
-	     if (no_diag_needed && on_penultimate_col){
-		t10::serial::compute_householder_vector( v);
+	     const std::size_t comm_idx = 
+	     block_column_index( k, data.row_length, data.n);
+	     if (on_last_col && penult_blck_col){
+		serial::compute_householder_vector( v);
 		beta = v[0]; v[0]=1;
-	     } else{
-	       const std::size_t block_col = t10::block_column_index( k, data.row_length, n);
-	       beta = compute_householder_vector( v, data.col_comm[ block_col+offset]);
-	     }
-	     mpi::broadcast( data.row_comm[ block_col+offset], v, 0);
+	     } else {
+	      beta = compute_householder_vector( v, 
+					data.col_comm[ comm_idx+on_last_col]);
+	     } 
+	     mpi::broadcast( data.row_comm[ comm_idx], v, 0);
 	     //TODO: apply_transformation
 	}
 	template< typename Matrix_data>
@@ -248,12 +258,11 @@ namespace t10 {
 			data.block_col < col_idx){ return; }
 		if (data.block_col == col_idx){
 		     if(col_idx == data.row_length-1){
-		     	t10::serial::hessenberg( data.M);
+		     	serial::hessenberg( data.M);
 			return;
 		     }
 		     if(data.diag() && k == data.last_col-1){ return; }
-		     dist_reduce_column( data,k);  
-		   }
+		     dist_reduce_column( data, k);  
 		}else{ apply_householder( data, k); }
 	   }
 	}
@@ -269,4 +278,4 @@ namespace t10 {
 
 } //end namespace parallel
 } //end namespace t10
-#endif //QR_ALGORITHM_H
+#endif //QR_DISTRIBUTED_H

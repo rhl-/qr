@@ -63,7 +63,7 @@ int main( int argc, char * argv[]){
 	}
 	sleep( 1);
 	data.world.barrier();
-	t10::qr( data);
+	t10::parallel::qr( data);
 	#ifdef REDIRECT_OUTPUT
 	std::cout.rdbuf(coutbuf); //reset to standard output again
 	out.close();
