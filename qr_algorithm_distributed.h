@@ -36,7 +36,7 @@ namespace t10 {
 	}
 
 	template< typename T>
-	int sign( const T & x){return (x < 0) ? -1 : 1;}
+	int sign( const T & x){ return (x < 0) ? -1 : 1; }
 	
 	template< typename Value>
 	Value encode_givens( const Value & c, const Value & s){
@@ -144,13 +144,13 @@ namespace t10 {
 		} while( std::fabs(H(n-1,n-2)) > tol);
 		
 	}
-	//TODO: MPI group
+	
 	template< typename Vector, typename Communicator>
 	typename Vector::value_type compute_householder_vector( Vector & v, 
 					 const Communicator & column_comm){
 		typedef typename Vector::value_type Value;
 		Value x = v[0];
-		//root process should be zero, according to at least OpenMPI
+		//root process should be zero, acol_commording to at least OpenMPI
 		//documentation
 		mpi::broadcast( column_comm, x, 0);
 		Value beta = 1.0;
@@ -203,11 +203,12 @@ namespace t10 {
 	const std::size_t blocks = data.row_length;
 	const std::size_t block_col = t10::block_column_index( k, blocks, n);
 	const std::size_t col_root = data.block_col - block_col;
+	const Communicator & row_comm = data.row_comm[ block_col];
+	const Communicator & col_comm = data.col_comm[ block_col];
 	Matrix & M = data.M;
-	Value beta=0.0;
-	Vector v_left(M.size1(),0);
-	
-	//mpi::broadcast(row_comm,  v_left, 0);
+	Value beta = 0.0;
+	Vector v_left( M.size1(), 0);
+	mpi::broadcast(row_comm,  v_left, 0);
 	std::cout  << "k = " << k 
 		   << " (" << id << ")"
 		   << " would normally bcast on {"
@@ -215,7 +216,7 @@ namespace t10 {
 		   << "} for v_left" << std::endl; 
 	Vector v_right(v_left);
 	v_right.resize(M.size1(),M.size1()==M.size2());
-	//mpi::broadcast(col_comm,  v_right, col_root);
+	mpi::broadcast(col_comm,  v_right, col_root);
 	std::cout  << "k = " << k 
 		   << " (" << id << ")"
 		   << " would normally bcast on {"
@@ -236,13 +237,13 @@ namespace t10 {
 	typedef typename Matrix::value_type Value;
 	typedef typename ublas::vector< Value> Vector;
 	typedef typename ublas::matrix_column< Matrix> Matrix_column;
-	
 	Matrix & M = data.M;
 	const std::size_t id = data.world.rank();
 	const std::size_t n = data.n;
 	const std::size_t & blocks = data.row_length;
 	const std::size_t & block_col = t10::block_column_index( k, blocks, n);
-	const Communicator& cc = data.col_comm[block_col];
+	const Communicator & row_comm = data.row_comm[ block_col];
+	const Communicator & col_comm = data.col_comm[block_col];
 	const std::size_t offset = data.diag(); 
 	const std::size_t col_idx = k-data.first_col;
 	const std::size_t row_idx = col_idx+offset;
@@ -250,23 +251,21 @@ namespace t10 {
 	
 	Matrix_column col(M, col_idx);
 	Vector v = ublas::subrange( col, row_idx, rend);
-	Value beta = compute_householder_vector( v,cc);
+	Value beta = compute_householder_vector( v,col_comm);
 	
 	bool sc = (data.block_col == data.row_length-2);
 	const std::size_t cidx = data.block_col + 1;
 	if( !sc){
-	 const Communicator & cc = data.col_comm[ cidx];
-	 beta = compute_householder_vector( v,cc);
+	 const Communicator & col_comm = data.col_comm[ cidx];
+	 beta = compute_householder_vector( v,col_comm);
 	}else{
 		//TODO: call serial householder alg
 	}
 
-
-
 	//TODO: attach beta to vs
-	//mpi::broadcast( row_comm, v, 0);
+	mpi::broadcast( row_comm, v, 0);
 	Vector w(v);
-	//mpi::broadcast( cc, w, 0);
+	mpi::broadcast( col_comm, w, 0);
 	std::cout << "k = " << k 
 		  << "(" << id << ")" 
 		  << " would normally bcast hv on {"
@@ -293,14 +292,16 @@ namespace t10 {
 		const std::size_t id = data.world.rank();
 		bool sc = (data.block_col == data.row_length-2);
 		const std::size_t cidx = data.block_col + 1;
+		Communicator & row_comm = data.row_comm[ cidx];
+		
 		if( !sc){
-		 const Communicator & cc = data.col_comm[ cidx];
-		 beta = compute_householder_vector( v,cc);
+		 const Communicator & col_comm = data.col_comm[ cidx];
+		 beta = compute_householder_vector( v,col_comm);
 		}else{
 			//TODO: call serial householder alg
 		}
 		//TODO: attach beta to vs
-		//mpi::broadcast( row_comm, v, 0);
+		mpi::broadcast( row_comm, v, 0);
 		std::cout << "k = " << data.last_col-1 
 			  << " (" << id  << ")" 
 			  << " would normally bcast hv on {"
@@ -308,7 +309,8 @@ namespace t10 {
 			  << std::endl;
 		Vector w(v);
 		if ( !sc){ 
-		//mpi::broadcast( cc, w, 0);
+		const Communicator & col_comm = data.col_comm[ cidx];
+		mpi::broadcast( col_comm, w, 0);
 		std::cout << "k = " << data.last_col-1 
 			  << " (" << id  << ")" 
 			 << " would normally bcast hv on {"
@@ -316,37 +318,31 @@ namespace t10 {
 			  << std::endl;
 		}
 	}
-
+	
 	template< typename Matrix_data>
 	void hessenberg( Matrix_data & data){
 	    const std::size_t id = data.world.rank();
-	    const std::size_t blocks = data.row_length;
-	    bool ready_to_load_balance=false;
 	    const std::size_t n = data.n;
 	    const std::size_t p = data.row_length;
 	    //Algorithm 7.4.2 GVL
 	    for (std::size_t k = 0; k < n-2; ++k){
-		  //Case 0: You are not involving in computing a HV
-		  //But you are going to need to receive them and multiply
-		  if( k < data.first_col && k < data.last_row) { 
-			apply_householder( data, k); 
-		  }
-		  //Note: order matters here: both of these implications:
-		  //!(k>=data.last_col) && data.above() && (!k < data.first_col)
-		  //data.above() && !(data.last_row)
-		  //=> you can return
-		  else if (k >= data.last_col || data.above() ){ return; }
-		  else if (k == data.last_col-1){
-		  	//The diagonal processor in the current block col 
-			//always gets to leave early
-			if(data.diag()){ return; } 
-			dist_reduce_column( data); 
-		  } else if (k < data.last_col-1){
-			dist_reduce_column( data,k); 
-		  }
-	
-		 // }
-	    	}
+		const std::size_t col_idx = block_column_index(k, p, n);
+		if (data.block_row < col_idx || 
+			data.block_col < col_idx){ return; }
+		if (data.block_col == col_idx){
+		     if(col_idx == data.row_length-1){
+			//TODO: make the line below compile
+		     	//t10::serial::hessenberg( data.M);
+			return;
+		     }
+		     else if(k == data.last_col-1){
+		     	if (data.diag()) { return; }
+		     	dist_reduce_column( data); 
+		     }else{
+		     	dist_reduce_column( data,k);  
+		   }
+		}else{ apply_householder( data, k); }
+	   }
 	}
 
 	template< typename Matrix_data>
