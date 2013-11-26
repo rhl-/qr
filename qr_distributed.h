@@ -15,10 +15,11 @@
 
 //PROJECT
 #include "io.h"
+#include "qr_serial.h"
 
 namespace ublas = boost::numeric::ublas;
-
 namespace t10 {
+	namespace parallel {
 	//GVL Section 5.1.9
 	template< typename Value>
 	void compute_givens(const Value & a, const Value & b, 
@@ -86,8 +87,6 @@ namespace t10 {
 		}
 	}
 
-	//TODO: Specialize for symmetric matrices
-	
 	template< typename Matrix>
 	void qr_iteration( Matrix & H, double tol=1e-16){
 		#ifdef QR_ITERATION_OUTPUT
@@ -150,8 +149,6 @@ namespace t10 {
 					 const Communicator & column_comm){
 		typedef typename Vector::value_type Value;
 		Value x = v[0];
-		//root process should be zero, acol_commording to at least OpenMPI
-		//documentation
 		mpi::broadcast( column_comm, x, 0);
 		Value beta = 1.0;
 		const Value inner_prod = ublas::inner_prod(v,v);
@@ -198,30 +195,15 @@ namespace t10 {
 	typedef typename Matrix_data::Matrix Matrix; 
 	typedef typename Matrix::value_type Value;
 	typedef typename ublas::vector< Value> Vector;
-	const std::size_t n = data.n;
-	const std::size_t id = data.world.rank();
-	const std::size_t blocks = data.row_length;
-	const std::size_t block_col = t10::block_column_index( k, blocks, n);
+	const std::size_t block_col = t10::block_column_index( k, data.row_length, data.n);
 	const std::size_t col_root = data.block_col - block_col;
-	const Communicator & row_comm = data.row_comm[ block_col];
-	const Communicator & col_comm = data.col_comm[ block_col];
 	Matrix & M = data.M;
 	Value beta = 0.0;
 	Vector v_left( M.size1(), 0);
-	mpi::broadcast(row_comm,  v_left, 0);
-	std::cout  << "k = " << k 
-		   << " (" << id << ")"
-		   << " would normally bcast on {"
-		   << data.row[ block_col]
-		   << "} for v_left" << std::endl; 
+	mpi::broadcast( data.row_comm[ block_col],  v_left, 0);
 	Vector v_right(v_left);
-	v_right.resize(M.size1(),M.size1()==M.size2());
-	mpi::broadcast(col_comm,  v_right, col_root);
-	std::cout  << "k = " << k 
-		   << " (" << id << ")"
-		   << " would normally bcast on {"
-		   << data.col[ block_col]
-		   << "} for v_right" << std::endl; 
+	v_right.resize(M.size1(), M.size1()==M.size2());
+	mpi::broadcast(data.col_comm[ block_col],  v_right, col_root);
 	/*
 	apply_householder_left( beta, 
 				vs_left, M, row_comm);
@@ -229,85 +211,31 @@ namespace t10 {
 				 vs_right, M, col_comm);
 	*/
 	}
-
 	template< typename Matrix_data>
 	void dist_reduce_column( Matrix_data & data, const std::size_t & k){
-	typedef typename Matrix_data::Communicator Communicator; 
-	typedef typename Matrix_data::Matrix Matrix; 
-	typedef typename Matrix::value_type Value;
-	typedef typename ublas::vector< Value> Vector;
-	typedef typename ublas::matrix_column< Matrix> Matrix_column;
-	Matrix & M = data.M;
-	const std::size_t id = data.world.rank();
-	const std::size_t n = data.n;
-	const std::size_t & blocks = data.row_length;
-	const std::size_t & block_col = t10::block_column_index( k, blocks, n);
-	const Communicator & row_comm = data.row_comm[ block_col];
-	const std::size_t offset = data.diag(); 
-	const std::size_t col_idx = k-data.first_col;
-	const std::size_t row_idx = col_idx+offset;
-	const std::size_t rend = M.size1();
-	
-	Matrix_column col(M, col_idx);
-	Vector v = ublas::subrange( col, row_idx, rend);
-	Value beta = compute_householder_vector( v, data.col_comm[ block_col]);
-	
-	bool sc = (data.block_col == data.row_length-2);
-	if( !sc){
-	 beta = compute_householder_vector( v, data.col_comm[ block_col+1]);
-	}else{
-		//TODO: call serial householder alg
+	     typedef typename Matrix_data::Matrix Matrix;
+	     typedef typename Matrix::value_type Value;
+	     typedef typename ublas::matrix_column< Matrix> Matrix_column;
+	     typedef typename ublas::vector< Value> Vector;
+	     
+	     Matrix & M = data.M;
+	     const bool no_diag_needed = (k == data.last_col-1);
+	     const bool on_penultimate_col = (data.block_col == data.row_length-2);
+	     const std::size_t offset = on_penultimate_col;
+	     const std::size_t column_index = k - data.first_col; 
+	     Matrix_column col(M, column_index);
+	     Vector v( col);
+	     Value beta;
+	     if (no_diag_needed && on_penultimate_col){
+		t10::serial::compute_householder_vector( v);
+		beta = v[0]; v[0]=1;
+	     } else{
+	       const std::size_t block_col = t10::block_column_index( k, data.row_length, n);
+	       beta = compute_householder_vector( v, data.col_comm[ block_col+offset]);
+	     }
+	     mpi::broadcast( data.row_comm[ block_col+offset], v, 0);
+	     //TODO: apply_transformation
 	}
-
-	//TODO: attach beta to vs
-	mpi::broadcast( data.row_comm[ block_col], v, 0);
-	if (!sc){ 
-		Vector w(v);
-		mpi::broadcast( data.col_comm[ block_col+1], w, 0); 
-	}
-	}
-
-	template< typename Matrix_data>
-	void dist_reduce_column( Matrix_data & data){
-		typedef typename Matrix_data::Communicator Communicator;
-		typedef typename Matrix_data::Matrix Matrix;
-		typedef typename Matrix::value_type Value;
-		typedef typename ublas::matrix_column< Matrix> Matrix_column;
-		typedef typename ublas::vector< Value> Vector;
-		Matrix & M = data.M;
-		Matrix_column col(M,M.size2()-1);
-		Vector v( col);
-		Value beta;
-		const std::size_t id = data.world.rank();
-		bool sc = (data.block_col == data.row_length-2);
-		const std::size_t cidx = data.block_col + 1;
-		Communicator & row_comm = data.row_comm[ cidx];
-		
-		if( !sc){
-		 const Communicator & col_comm = data.col_comm[ cidx];
-		 beta = compute_householder_vector( v,col_comm);
-		}else{
-			//TODO: call serial householder alg
-		}
-		//TODO: attach beta to vs
-		mpi::broadcast( row_comm, v, 0);
-		std::cout << "k = " << data.last_col-1 
-			  << " (" << id  << ")" 
-			  << " would normally bcast hv on {"
-			  << data.row[ data.block_col] << "}"
-			  << std::endl;
-		Vector w(v);
-		if ( !sc){ 
-		const Communicator & col_comm = data.col_comm[ cidx];
-		mpi::broadcast( col_comm, w, 0);
-		std::cout << "k = " << data.last_col-1 
-			  << " (" << id  << ")" 
-			 << " would normally bcast hv on {"
-			  << data.col[ cidx] << "}"
-			  << std::endl;
-		}
-	}
-	
 	template< typename Matrix_data>
 	void hessenberg( Matrix_data & data){
 	    const std::size_t id = data.world.rank();
@@ -320,15 +248,11 @@ namespace t10 {
 			data.block_col < col_idx){ return; }
 		if (data.block_col == col_idx){
 		     if(col_idx == data.row_length-1){
-			//TODO: make the line below compile
-		     	//t10::serial::hessenberg( data.M);
+		     	t10::serial::hessenberg( data.M);
 			return;
 		     }
-		     else if(k == data.last_col-1){
-		     	if (data.diag()) { return; }
-		     	dist_reduce_column( data); 
-		     }else{
-		     	dist_reduce_column( data,k);  
+		     if(data.diag() && k == data.last_col-1){ return; }
+		     dist_reduce_column( data,k);  
 		   }
 		}else{ apply_householder( data, k); }
 	   }
@@ -343,5 +267,6 @@ namespace t10 {
 			}*/
 	}
 
+} //end namespace parallel
 } //end namespace t10
 #endif //QR_ALGORITHM_H
