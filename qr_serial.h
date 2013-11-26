@@ -13,6 +13,7 @@
 namespace ublas = boost::numeric::ublas;
 
 namespace t10 {
+	namespace serial{
 	//GVL Section 5.1.9
 	template< typename Value>
 	void compute_givens(const Value & a, const Value & b, Value & c, Value & s){
@@ -114,8 +115,10 @@ namespace t10 {
 			#ifdef QR_ITERATION_OUTPUT
 			std::cout.precision( 7);
 			std::cout.setf( std::ios::fixed, std:: ios::floatfield );
-			std::cout << "---- Shift: " << std::setw( 10) << shift  << std::endl;
-			std::cout << "---- Error: " << std::setw( 10)  << std::fabs(H(n-1,n-2)) << std::endl;
+			std::cout << "---- Shift: " << std::setw( 10) 
+				  << shift  << std::endl;
+			std::cout << "---- Error: " << std::setw( 10) 
+				  << std::fabs(H(n-1,n-2)) << std::endl;
 			#endif //DEBUG_QR_ITERATION
 		} while( std::fabs(H(n-1,n-2)) > tol);
 		
@@ -139,18 +142,21 @@ namespace t10 {
 	
 	template< typename Vector, typename Matrix>
 	void apply_householder_left( const typename Vector::value_type & beta, 
-				     const Vector & v, Matrix & M, const std::size_t k = 0){
+				     const Vector & v, Matrix & M, 
+				     const std::size_t k = 0){
 		if (beta != 0){
 			ublas::range r1(k+1, M.size1());
 			ublas::range r2(k, M.size2());
 			ublas::matrix_range< Matrix> S(M, r1,r2);
-			S -= beta*ublas::outer_prod( v, ublas::prod<Vector>(ublas::trans(v),S));
+			S -= beta*ublas::outer_prod( v, 
+				ublas::prod<Vector>(ublas::trans(v),S));
 		}
 	}
 
 	template< typename Vector, typename Matrix>
 	void apply_householder_right( const typename Vector::value_type & beta, 
-				      const Vector & v, Matrix & M, const std::size_t k = 0){
+				      const Vector & v, Matrix & M, 
+				      const std::size_t k = 0){
 		if (beta != 0){
 			ublas::range r1(0, M.size1());
 			ublas::range r2(k+1, M.size2());
@@ -210,6 +216,6 @@ namespace t10 {
 			}
 		}
 	}
-
+} //end namespace serial
 } //end namespace t10
 #endif //QR_ALGORITHM_H

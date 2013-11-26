@@ -17,7 +17,7 @@
 
 //PROJECT
 #include "io.h"
-#include "qr_algorithm_distributed.h"
+#include "qr_distributed.h"
 #include "util.h"
 
 namespace ublas = boost::numeric::ublas;

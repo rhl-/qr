@@ -1,6 +1,6 @@
 
 #include <iostream>
-#include "qr_algorithm_serial.h"
+#include "qr_serial.h"
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/io.hpp>
 #include <algorithm>

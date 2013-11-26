@@ -243,7 +243,6 @@ namespace t10 {
 	const std::size_t & blocks = data.row_length;
 	const std::size_t & block_col = t10::block_column_index( k, blocks, n);
 	const Communicator & row_comm = data.row_comm[ block_col];
-	const Communicator & col_comm = data.col_comm[block_col];
 	const std::size_t offset = data.diag(); 
 	const std::size_t col_idx = k-data.first_col;
 	const std::size_t row_idx = col_idx+offset;
@@ -251,31 +250,21 @@ namespace t10 {
 	
 	Matrix_column col(M, col_idx);
 	Vector v = ublas::subrange( col, row_idx, rend);
-	Value beta = compute_householder_vector( v,col_comm);
+	Value beta = compute_householder_vector( v, data.col_comm[ block_col]);
 	
 	bool sc = (data.block_col == data.row_length-2);
-	const std::size_t cidx = data.block_col + 1;
 	if( !sc){
-	 const Communicator & col_comm = data.col_comm[ cidx];
-	 beta = compute_householder_vector( v,col_comm);
+	 beta = compute_householder_vector( v, data.col_comm[ block_col+1]);
 	}else{
 		//TODO: call serial householder alg
 	}
 
 	//TODO: attach beta to vs
-	mpi::broadcast( row_comm, v, 0);
-	Vector w(v);
-	mpi::broadcast( col_comm, w, 0);
-	std::cout << "k = " << k 
-		  << "(" << id << ")" 
-		  << " would normally bcast hv on {"
-		  << data.col[ data.block_col] << "}" 
-		  << std::endl;
-	std::cout << "k = " << k  
-		  << "(" << id << ")" 
-		  << " would normally bcast hv on {"
-		  << data.row[ data.block_col] << "}"
-		  << std::endl;
+	mpi::broadcast( data.row_comm[ block_col], v, 0);
+	if (!sc){ 
+		Vector w(v);
+		mpi::broadcast( data.col_comm[ block_col+1], w, 0); 
+	}
 	}
 
 	template< typename Matrix_data>
