@@ -1,17 +1,16 @@
 #ifndef T10_UTIL_H                                          
 #define T10_UTIL_H                                          
-//#define UTIL_DEBUG 
 
-//Boost MPI
-#include <boost/mpi.hpp>
+//BOOST MPI
+#include <boost/mpi/group.hpp>
 
 //Boost
 #include <boost/unordered_map.hpp>
+
 //STL
 #include <algorithm>
 #include <numeric>
 
-#include "io.h"
 namespace mpi = boost::mpi;
 
 template< typename Stream, typename T>
@@ -77,8 +76,6 @@ namespace t10 {
 	template< typename Matrix_data>
 	void construct_communicators( Matrix_data & data){
 		typedef typename Matrix_data::Communicator Communicator;
-		typedef typename Matrix_data::Map_vector Map_vector;
-		typedef typename Map_vector::value_type Map;
 		typedef typename std::vector< std::size_t> Vector;
 		typedef typename Vector::iterator Iterator;
 
@@ -123,12 +120,14 @@ namespace t10 {
 		    Vector srow( row.begin()+k, row.end());
 		    mpi::group row_group = t10::create_group(world, srow);
 		    row_comm.push_back( mpi::communicator( world, row_group));
+		    data.row.push_back( srow);
 		}
  		
 		for (std::size_t k = 0; k < std::max(data.block_row,one); ++k) {
 		    Vector scol( col.begin()+k, col.end()); 
 		    mpi::group col_group = t10::create_group(world, scol);
 		    col_comm.push_back( mpi::communicator( world, col_group));
+		    data.col.push_back( scol);
 		}
 	}
 
@@ -155,12 +154,15 @@ namespace t10 {
 		typedef _Communicator Communicator;
 		typedef typename boost::unordered_map< std::size_t,
 						       std::size_t> Map;
-		typedef typename std::vector< Map> Map_vector;
 		typedef typename std::vector< std::size_t> Vector;
 		typedef typename std::vector< _Communicator> Vector_comm;
 
-		bool above() const { return block_row <= block_col;}
-		bool below() const { return block_col <= block_row;}
+		bool special() const { 
+			return (block_col == row_length-2) && 
+				block_row==row_length-1;
+		} 
+		bool above() const { return block_row < block_col;}
+		bool below() const { return block_col < block_row;}
 		bool diag()  const { return block_row == block_col; }
 
 		//Internal Matrix Type
@@ -186,6 +188,8 @@ namespace t10 {
 		
 		Vector_comm col_comm;
 		Vector_comm row_comm;
+		std::vector< Vector> col; //for debugging
+		std::vector< Vector> row; //for debugging
 	}; // struct Matrix_data
 }//end namespace t10
 

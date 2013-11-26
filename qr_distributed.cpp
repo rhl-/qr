@@ -40,11 +40,32 @@ int main( int argc, char * argv[]){
 	Matrix_data data;
 	std::cout << env.processor_name() << " <----> " 
 		  << data.world.rank() << std::flush << std::endl;
+	#ifdef REDIRECT_OUTPUT
+	std::stringstream ss;
+	ss << "out." << data.world.rank();
+	std::ofstream out(ss.str().c_str());
+        std::streambuf *coutbuf = std::cout.rdbuf(); //save old buf
+        std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
+	#endif
+
 	//read input
 	po::variables_map vm;
 	t10::process_args( argc, argv, vm);
 	std::string filename( vm[ "input-file"].as< std::string>());
 	t10::read_matrix( filename, data);
 	t10::construct_communicators( data);
+	std::cout << data.world.rank() 
+		  << " has a " 
+		  << data.M.size1() << " x " << data.M.size2() 
+		  << std::endl << std::flush;
+	if (data.world.rank() == 0){ 
+		std::cout << "--------------------" << std::endl << std::flush;
+	}
+	sleep( 1);
+	data.world.barrier();
 	t10::qr( data);
+	#ifdef REDIRECT_OUTPUT
+	std::cout.rdbuf(coutbuf); //reset to standard output again
+	out.close();
+	#endif
 }

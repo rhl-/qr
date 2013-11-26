@@ -2,17 +2,20 @@
 #define QR_ALGORITHM_H
 #define QR_HOUSE_DEBUG
 #define QR_ITERATION_OUTPUT
-//#define DEBUG_QR_ITERATION //comment me out to turn off debug mode
-#include <boost/timer.hpp>
+
+//BOOST MPI
+#include <boost/mpi/communicator.hpp>
+#include <boost/mpi/collectives.hpp>
+
+//BOOST UBLAS
 #include <boost/numeric/ublas/banded.hpp> //for banded_adaptor
 #include <boost/numeric/ublas/matrix.hpp> //for slices
 #include <boost/numeric/ublas/matrix_proxy.hpp> //for slices
 #include <boost/numeric/ublas/vector_proxy.hpp> //for slices
-#include "io.h"
-#include "util.h"
 
-#ifdef DEBUG_QR_ITERATION
-#endif //endif DEBUG_QR_ITERATION
+//PROJECT
+#include "io.h"
+
 namespace ublas = boost::numeric::ublas;
 
 namespace t10 {
@@ -189,121 +192,161 @@ namespace t10 {
 			M -= beta*ublas::outer_prod( w, v);
 		}*/
 	}
+	template< typename Matrix_data>
+	void apply_householder( Matrix_data & data, const std::size_t & k){ 
+	typedef typename Matrix_data::Communicator Communicator; 
+	typedef typename Matrix_data::Matrix Matrix; 
+	typedef typename Matrix::value_type Value;
+	typedef typename ublas::vector< Value> Vector;
+	const std::size_t n = data.n;
+	const std::size_t id = data.world.rank();
+	const std::size_t blocks = data.row_length;
+	const std::size_t block_col = t10::block_column_index( k, blocks, n);
+	const std::size_t col_root = data.block_col - block_col;
+	Matrix & M = data.M;
+	Value beta=0.0;
+	Vector v_left(M.size1(),0);
+	
+	//mpi::broadcast(row_comm,  v_left, 0);
+	std::cout  << "k = " << k 
+		   << " (" << id << ")"
+		   << " would normally bcast on {"
+		   << data.row[ block_col]
+		   << "} for v_left" << std::endl; 
+	Vector v_right(v_left);
+	v_right.resize(M.size1(),M.size1()==M.size2());
+	//mpi::broadcast(col_comm,  v_right, col_root);
+	std::cout  << "k = " << k 
+		   << " (" << id << ")"
+		   << " would normally bcast on {"
+		   << data.col[ block_col]
+		   << "} for v_right" << std::endl; 
+	/*
+	apply_householder_left( beta, 
+				vs_left, M, row_comm);
+	apply_householder_right( beta, 
+				 vs_right, M, col_comm);
+	*/
+	}
 
 	template< typename Matrix_data>
-	void hessenberg( Matrix_data & data){
+	void dist_reduce_column( Matrix_data & data, const std::size_t & k){
+	typedef typename Matrix_data::Communicator Communicator; 
+	typedef typename Matrix_data::Matrix Matrix; 
+	typedef typename Matrix::value_type Value;
+	typedef typename ublas::vector< Value> Vector;
+	typedef typename ublas::matrix_column< Matrix> Matrix_column;
+	
+	Matrix & M = data.M;
+	const std::size_t id = data.world.rank();
+	const std::size_t n = data.n;
+	const std::size_t & blocks = data.row_length;
+	const std::size_t & block_col = t10::block_column_index( k, blocks, n);
+	const Communicator& cc = data.col_comm[block_col];
+	const std::size_t offset = data.diag(); 
+	const std::size_t col_idx = k-data.first_col;
+	const std::size_t row_idx = col_idx+offset;
+	const std::size_t rend = M.size1();
+	
+	Matrix_column col(M, col_idx);
+	Vector v = ublas::subrange( col, row_idx, rend);
+	Value beta = compute_householder_vector( v,cc);
+	
+	bool sc = (data.block_col == data.row_length-2);
+	const std::size_t cidx = data.block_col + 1;
+	if( !sc){
+	 const Communicator & cc = data.col_comm[ cidx];
+	 beta = compute_householder_vector( v,cc);
+	}else{
+		//TODO: call serial householder alg
+	}
+
+
+
+	//TODO: attach beta to vs
+	//mpi::broadcast( row_comm, v, 0);
+	Vector w(v);
+	//mpi::broadcast( cc, w, 0);
+	std::cout << "k = " << k 
+		  << "(" << id << ")" 
+		  << " would normally bcast hv on {"
+		  << data.col[ data.block_col] << "}" 
+		  << std::endl;
+	std::cout << "k = " << k  
+		  << "(" << id << ")" 
+		  << " would normally bcast hv on {"
+		  << data.row[ data.block_col] << "}"
+		  << std::endl;
+	}
+
+	template< typename Matrix_data>
+	void dist_reduce_column( Matrix_data & data){
 		typedef typename Matrix_data::Communicator Communicator;
 		typedef typename Matrix_data::Matrix Matrix;
 		typedef typename Matrix::value_type Value;
 		typedef typename ublas::matrix_column< Matrix> Matrix_column;
 		typedef typename ublas::vector< Value> Vector;
-		typedef typename ublas::vector_range< Vector> Vector_range;
-		typedef typename std::pair< std::size_t, std::size_t> Pair;
 		Matrix & M = data.M;
-		const std::size_t n = data.n;
+		Matrix_column col(M,M.size2()-1);
+		Vector v( col);
+		Value beta;
 		const std::size_t id = data.world.rank();
-		const std::size_t blocks = std::sqrt( data.world.size());
-		bool ready_to_load_balance=false;
-		//Algorithm 7.4.2 GVL
-		for (std::size_t k = 0; k < n-2; ++k){
-			const std::size_t block_col = 
-			t10::block_column_index( k, blocks, n);
-			const Communicator& row_comm = data.row_comm[block_col];
-			const Communicator& col_comm = data.col_comm[block_col];
-			const std::size_t col_root = data.block_col - block_col;
-			if( k < data.first_col){
-				Value beta=0.0;
-				Vector v_left(M.size1(),0);
-				mpi::broadcast(row_comm,  v_left, 0);
-				std::cout << row_comm.rank() 
-					  << " (" << id << ")"
-					  <<  " v_left: " 
-					  << v_left << std::endl
-					  << "about to bcast from: " << col_root
-					  << std::endl;
-				Vector v_right(v_left);
-				v_right.resize(M.size1(),M.size1()==M.size2());
-				mpi::broadcast(col_comm,  v_right, col_root);
-				std::cout << row_comm.rank() 
-					  << " (" << id << ")"
-					  << " v_right: " 
-					  << v_right << std::endl; 
-				/*
-				apply_householder_left( beta, 
-							vs_left, M, row_comm);
-				apply_householder_right( beta, 
-							 vs_right, M, col_comm);
-				*/
-			}
-			else if(data.below() && k < data.last_col-1){ 
-				const Communicator & cc = col_comm;
-				const std::size_t offset = data.diag(); 
-				const std::size_t col_idx = k-data.first_col;
-				const std::size_t row_idx = col_idx+offset;
-				const std::size_t rend = M.size1();
-				Matrix_column col(M, col_idx);
-				Vector v = ublas::subrange( col, row_idx, rend);
-				Value beta = compute_householder_vector( v,cc);
-				//TODO: attach beta to vs
-				std::cout << row_comm.rank() << " (" << id << ")"
-					  << " computed " << v << std::endl 
-					  << " and will now bcast" << std::endl;
-				mpi::broadcast( row_comm, v, 0);
-				std::cout << row_comm.rank() << " (" << id << ")"
-					  << " recieved v from local 0 " 
-					  << std::endl 
-					  << v << std::endl 
-					  << " about to bcast for col" 
-					  << std::endl;
-				Vector w(v);
-				mpi::broadcast( cc, w, 0);
-				std::cout << cc.rank() << " (" << id << ")" 
-					  << " recieved w from local 0 " 
-					  << std::endl 
-					  << w << std::endl; 
-			}
-			//the last column of every block has a special case
-			else if( data.below() && !data.diag() 
-					&& k == data.last_col){
-				const std::size_t cidx = data.block_col + 1;
-				const Communicator & cc = data.col_comm[ cidx];
-				const std::size_t offset = (cc.rank()==0);
-				const std::size_t col_idx = M.size2()-1;
-				const std::size_t rend = M.size1();
-				const std::size_t row_idx = (rend-1)+offset;
-				Matrix_column col(M,col_idx);
-				Vector v = ublas::subrange( col,row_idx, rend);
-				Value beta = compute_householder_vector( v,cc);
-				//TODO: attach beta to vs
-				mpi::broadcast( row_comm, v, 0);
-				std::cout << id << " just send hv" << std::endl;
-				Vector w(v);
-				mpi::broadcast( cc, w, 0);
-			} else if( data.diag() && 
-				   data.block_col == block_col && 
-				   block_col == data.row_length-1){
-			}
-			else if( !data.diag() ){
-				ready_to_load_balance = true;
-				break;
-			}
-			//JUST FOR DEBUGGING
-			break;
+		bool sc = (data.block_col == data.row_length-2);
+		const std::size_t cidx = data.block_col + 1;
+		if( !sc){
+		 const Communicator & cc = data.col_comm[ cidx];
+		 beta = compute_householder_vector( v,cc);
+		}else{
+			//TODO: call serial householder alg
 		}
-		if (ready_to_load_balance){
-			if(data.above()){
-				ublas::range r1(0,M.size1()/2);
-				ublas::range r2(0, M.size2());
-				ublas::matrix_range< Matrix> S(M, r1,r2);
-				//TODO: Fix serialization issues
-				//data.world.send(data.partner,0,S.data());
-			}
-			else{
-				M.resize(M.size1(),M.size2()/2);
-				//TODO: Fix serialization issues
-				//data.world.recv(data.partner,0,M.data()); 
-			}
+		//TODO: attach beta to vs
+		//mpi::broadcast( row_comm, v, 0);
+		std::cout << "k = " << data.last_col-1 
+			  << " (" << id  << ")" 
+			  << " would normally bcast hv on {"
+			  << data.row[ data.block_col] << "}"
+			  << std::endl;
+		Vector w(v);
+		if ( !sc){ 
+		//mpi::broadcast( cc, w, 0);
+		std::cout << "k = " << data.last_col-1 
+			  << " (" << id  << ")" 
+			 << " would normally bcast hv on {"
+			  << data.col[ cidx] << "}"
+			  << std::endl;
 		}
+	}
+
+	template< typename Matrix_data>
+	void hessenberg( Matrix_data & data){
+	    const std::size_t id = data.world.rank();
+	    const std::size_t blocks = data.row_length;
+	    bool ready_to_load_balance=false;
+	    const std::size_t n = data.n;
+	    const std::size_t p = data.row_length;
+	    //Algorithm 7.4.2 GVL
+	    for (std::size_t k = 0; k < n-2; ++k){
+		  //Case 0: You are not involving in computing a HV
+		  //But you are going to need to receive them and multiply
+		  if( k < data.first_col && k < data.last_row) { 
+			apply_householder( data, k); 
+		  }
+		  //Note: order matters here: both of these implications:
+		  //!(k>=data.last_col) && data.above() && (!k < data.first_col)
+		  //data.above() && !(data.last_row)
+		  //=> you can return
+		  else if (k >= data.last_col || data.above() ){ return; }
+		  else if (k == data.last_col-1){
+		  	//The diagonal processor in the current block col 
+			//always gets to leave early
+			if(data.diag()){ return; } 
+			dist_reduce_column( data); 
+		  } else if (k < data.last_col-1){
+			dist_reduce_column( data,k); 
+		  }
+	
+		 // }
+	    	}
 	}
 
 	template< typename Matrix_data>

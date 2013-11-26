@@ -1,19 +1,16 @@
 #ifndef T10_IO_H
 #define T10_IO_H
-#include <boost/numeric/ublas/io.hpp> //io
 #include <iomanip>
 #include <sstream>
 #include <iostream>
 #include <string>
 #include <fstream>
 
-//BOOST MPI
-#include <boost/mpi/environment.hpp>
-#include <boost/mpi/communicator.hpp>
-
 //BOOST PROGRAM OPTIONS
 #include <boost/program_options.hpp>
 
+//BOOST UBLAS
+#include <boost/numeric/ublas/io.hpp> //io
 //MATRIX MARKET
 #include "mmio.h"
 
