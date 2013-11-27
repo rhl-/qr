@@ -211,8 +211,9 @@ namespace t10 {
 	typedef typename std::pair< Value, Vector> Pair;
 	const std::size_t block_col = block_column_index( k, data.row_length, 
 								      data.n);
-	const std::size_t column_index = k - data.first_col;
-	const std::size_t row_index = k - data.first_row;
+	const std::size_t column_index = local_column_index( k, data.row_length,
+								 data.n);
+	//const std::size_t row_index = k - data.first_row;
 	const std::size_t col_root = data.block_col - block_col;
 	const bool last_row = (k == data.last_row-1);
 	Matrix & M = data.M;
@@ -229,10 +230,10 @@ namespace t10 {
 	Vector v_right = ublas::subrange(vb_right, 1, vb_right.size());
 	const Value beta = vb_right[ 0];
 	apply_householder_right( beta, v_right, M, 
-				 row_index, data.col_comm[ block_col]);
+				 column_index, data.col_comm[ block_col]);
 	if ( !last_row ) { 
             apply_householder_left( beta, v_left, M, 
-				    row_index, data.row_comm[ block_col]);
+				    column_index, data.row_comm[ block_col]);
 	}
 	}
 
