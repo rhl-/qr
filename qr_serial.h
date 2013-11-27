@@ -1,5 +1,6 @@
 #ifndef QR_SERIAL_H
 #define QR_SERIAL_H
+#define PRINT_HV
 #include <boost/timer.hpp>
 #include <boost/numeric/ublas/banded.hpp> //for banded_adaptor
 #include <boost/numeric/ublas/matrix.hpp> //for slices
@@ -178,6 +179,9 @@ namespace t10 {
 			compute_householder_vector(vs);
 			//hackery to store beta without extra space
 			beta=vs[0]; vs[0]=1;
+			#ifdef PRINT_HV
+			std::cout << "k: " << k << " " << vs << std::endl;
+			#endif
 			apply_householder_left( beta, vs, M, k);
 			apply_householder_right( beta, vs, M, k);
 			//the algorithm hessenberg storing Q's would store v here

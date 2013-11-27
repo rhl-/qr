@@ -173,12 +173,10 @@ namespace t10 {
 	void apply_householder_left( const typename Vector::value_type & beta, 
 				     const Vector & v, 
 				     Matrix & M, const std::size_t k, 
-				     const Communicator & comm){
-		const bool root = (comm.rank()==0);
+				     const Communicator & comm,
+				     const bool flag=false){
 	        if (beta != 0){
-			std::cout << "r1: " << (k+1)*root << " -- " << M.size1() << std::endl
-				  << "r2: " << k << " -- " << M.size2() << std::endl << std::flush; 
-			ublas::range r1((k+1)*root, M.size1());
+			ublas::range r1((k+1)*flag, M.size1());
 			ublas::range r2(k,  M.size2());
 			ublas::matrix_range< Matrix> S(M, r1, r2);
 			Vector w = ublas::prod< Vector>( ublas::trans( v), S);
@@ -191,16 +189,17 @@ namespace t10 {
 	void apply_householder_right( const typename Vector::value_type & beta, 
 				      const Vector & v, 
 				      Matrix & M, const std::size_t k, 
-				      const Communicator & comm){ 
+				      const Communicator & comm,
+				      const bool flag=false){ 
 		const bool root = (comm.rank()==0);
-		//if (beta != 0){
-		//	ublas::range r1(0, M.size1());
-		//	ublas::range r2(k*root, M.size2());
-		//	ublas::matrix_range< Matrix> S(M, r1,r2);
-		//	Vector w = ublas::prod<Vector>(S,v);
-		//	mpi::all_reduce( comm, w, w, std::plus< Vector>()); 
-		//	S -= beta*ublas::outer_prod( w, v);
-		//}
+		if (beta != 0){
+			ublas::range r1(0, M.size1());
+			ublas::range r2((k+1)*flag, M.size2());
+			ublas::matrix_range< Matrix> S(M, r1,r2);
+			Vector w = ublas::prod<Vector>(S,v);
+			mpi::all_reduce( comm, w, w, std::plus< Vector>()); 
+			S -= beta*ublas::outer_prod( w, v);
+		}
 	}
 	template< typename Matrix_data>
 	void apply_householder( Matrix_data & data, const std::size_t & k){ 
@@ -213,7 +212,6 @@ namespace t10 {
 								      data.n);
 	const std::size_t column_index = local_column_index( k, data.row_length,
 								 data.n);
-	//const std::size_t row_index = k - data.first_row;
 	const std::size_t col_root = data.block_col - block_col;
 	const bool last_row = (k == data.last_row-1);
 	Matrix & M = data.M;
@@ -229,11 +227,34 @@ namespace t10 {
 	Vector v_left = ublas::subrange(vb_left, 1, vb_left.size());
 	Vector v_right = ublas::subrange(vb_right, 1, vb_right.size());
 	const Value beta = vb_right[ 0];
+	const bool on_the_left = (block_col == data.block_col);
+	const bool apply_right_offset = (k==(data.first_col-1));
+	const bool serial = apply_right_offset &&(data.row_length-block_col==2);
+	if( !serial){
+	std::cout << "id: " << data.world.rank() 
+		  << " k: " << k 
+		  << "about the parallel apply right" << std::endl; 
 	apply_householder_right( beta, v_right, M, 
-				 column_index, data.col_comm[ block_col]);
-	if ( !last_row ) { 
+				 column_index, 
+				 data.row_comm[ block_col+apply_right_offset],
+				 on_the_left);
+	std::cout << "id: " << data.world.rank() 
+		  << " k: " << k 
+		  << " done with the parallel apply right" << std::endl; 
+	} else {
+	std::cout << "k: " << k << "id: " << data.world.rank() << " column_index: " 
+		  << column_index+1 << " doing serial right apply" << std::endl 
+		  << print_matrix( M) << std::endl << "v: " << v_right << std::endl;
+	serial::apply_householder_right( beta, v_right, M, column_index+1); 
+		std::cout << "k: " << k << "id: " << data.world.rank() << " column_index: " 
+		  << column_index+1 << " done w. serial right apply" << std::endl;
+		
+	}
+	if ( !last_row ) {
+	    const bool on_the_top = (block_col == data.block_row); 
             apply_householder_left( beta, v_left, M, 
-				    column_index, data.row_comm[ block_col]);
+				    column_index, data.col_comm[ block_col],
+				    on_the_top);
 	}
 	}
 
@@ -264,9 +285,6 @@ namespace t10 {
 	      beta = compute_householder_vector( v, 
 					data.col_comm[ col_comm_idx]);
 	     }
-	     std::cout << "k: " << k 
-		       <<  " id: " << data.world.rank() 
-		       << " v: " << v << std::endl;
 	 
 	     Vector w( v.size()+1);
 	     std::copy( v.begin(), v.end(), w.begin()+1);
@@ -275,11 +293,14 @@ namespace t10 {
 	     if (!serial){ 
 	     mpi::broadcast( data.col_comm[ comm_idx], w, 0);
 	     Vector hv_right = ublas::subrange(w, 1, w.size());
+	     const bool on_the_left = (comm_idx == data.block_col); 
              apply_householder_right( beta, hv_right, M, column_index, 
-				        data.col_comm[ comm_idx]);
+				        data.row_comm[ comm_idx],
+					on_the_left);
 	     }
+	     const bool on_the_top = (comm_idx == data.block_row); 
 	     apply_householder_left( beta, v, M, column_index, 
-					data.row_comm[ comm_idx]);
+					data.col_comm[ comm_idx], on_the_top);
 	}
 	template< typename Matrix_data>
 	void hessenberg( Matrix_data & data){
@@ -290,16 +311,26 @@ namespace t10 {
 	    for (std::size_t k = 0; k < n-2; ++k){
 		const std::size_t col_idx = block_column_index(k, p, n);
 		if (data.block_row < col_idx || 
-			data.block_col < col_idx){ return; }
+			data.block_col < col_idx){ 
+			std::cout << "block_idx: " << data.block_row << " x " << data.block_col
+				  << "col_idx: " << col_idx << " id: " << id << std::endl << std::flush;
+			return; 
+		}
 		if (data.block_col == col_idx){
 		     if(col_idx == data.row_length-1){
-		     	serial::hessenberg( data.M);
+			std::cout << "Calling serial alg!" << std::endl;     
+			serial::hessenberg( data.M);
 			return;
 		     }
-		     if(data.diag() && k == data.last_col-1){ return; }
+		     if(data.diag() && k == data.last_col-1){
+			std::cout << "id: " << id << " is returning! k: " << k << std::endl << std::flush; 
+			return; 
+		     }
 		     dist_reduce_column( data, k);  
 		}else{ apply_householder( data, k); }
+	 	if (k == 4){ break; }
 	   }
+	   std::cout << id << " " << print_matrix( data.M) << std::endl << std::flush;
 	}
 
 	template< typename Matrix_data>
