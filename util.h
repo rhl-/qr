@@ -130,7 +130,19 @@ namespace t10 {
 		    data.col.push_back( scol);
 		}
 	}
-
+	std::size_t local_column_index(std::size_t k, std::size_t p,
+					std::size_t number_of_rows) {
+		//either k is within the larger blocks or not
+		//if k is within larger blocks, return k mod larger size
+		//else subtract total number of columns from the larger blocks
+		//from k and then return k mod average size
+		const std::size_t avg_block_size = number_of_rows / p;
+		const std::size_t remaining = number_of_rows % p;
+                // total number of columns which are within the larger blocks
+                const std::size_t total = (avg_block_size + 1)*remaining;
+		if (k < total) { return k % (avg_block_size + 1);}
+                return (k-total) % avg_block_size ;
+	}
 	std::size_t block_column_index(std::size_t k, std::size_t p, 
 				  std::size_t number_of_rows) {
 		
