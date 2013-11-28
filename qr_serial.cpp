@@ -68,10 +68,10 @@ int main( int argc, char * argv[]){
 	std::cout << " ------------------------------------------------- " << std::endl;	
 	//Hessenberg Reduction Test
 	std::cout << "Input Matrix: " << t10::print_matrix(HM)<< std::endl;
-	t10::hessenberg(HM);
+	t10::serial::hessenberg(HM);
 	std::cout << "M = " << t10::print_matrix(HM) << std::endl;
 	std::cout << "A = " << t10::print_matrix(A) << std::endl;
-	t10::qr(M);
+	t10::serial::qr(M);
 	Diagonal_adapter D(M);
 	std::cout << "D = " << t10::print_matrix(D) << std::endl;
 	std::cout << "Correct Eigs: " << E << std::endl; 	

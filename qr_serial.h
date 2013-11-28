@@ -140,9 +140,10 @@ namespace t10 {
 	template< typename Vector, typename Matrix>
 	void apply_householder_left( const typename Vector::value_type & beta, 
 				     const Vector & v, Matrix & M, 
-				     const std::size_t k = 0){
+				     const std::size_t k = 0,
+				     const bool flag=true){
 		if (beta != 0){
-			ublas::range r1(k+1, M.size1());
+			ublas::range r1((k+1)*flag, M.size1());
 			ublas::range r2(k, M.size2());
 			ublas::matrix_range< Matrix> S(M, r1,r2);
 			S -= beta*ublas::outer_prod( v, 
@@ -153,10 +154,11 @@ namespace t10 {
 	template< typename Vector, typename Matrix>
 	void apply_householder_right( const typename Vector::value_type & beta, 
 				      const Vector & v, Matrix & M, 
-				      const std::size_t k = 0){
+				      const std::size_t k = 0, 
+				      const bool flag=true){
 		if (beta != 0){
-			ublas::range r1(0, M.size1());
-			ublas::range r2(k+1, M.size2());
+			ublas::range r1(k, M.size1());
+			ublas::range r2((k+1)*flag, M.size2());
 			ublas::matrix_range< Matrix> S(M, r1,r2);
 			S -= beta*ublas::outer_prod( ublas::prod<Vector>(S,v), v);
 		}

@@ -38,6 +38,7 @@ int main( int argc, char * argv[]){
 	//initialize mpi
 	mpi::environment env(argc, argv);
 	Matrix_data data;
+	data.world.barrier();
 	std::cout << env.processor_name() << " <----> " 
 		  << data.world.rank() << std::flush << std::endl;
 	#ifdef REDIRECT_OUTPUT
@@ -54,18 +55,17 @@ int main( int argc, char * argv[]){
 	std::string filename( vm[ "input-file"].as< std::string>());
 	t10::read_matrix( filename, data);
 	t10::construct_communicators( data);
-	std::cout << data.world.rank() 
+	/*std::cout << data.world.rank() 
 		  << " has a " 
 		  << data.M.size1() << " x " << data.M.size2() 
 		  << std::endl << std::flush;
 	if (data.world.rank() == 0){ 
 		std::cout << "--------------------" << std::endl << std::flush;
-	}
-	sleep( 1);
-	data.world.barrier();
+	}*/
 	t10::parallel::qr( data);
+	std::cerr << data.world.rank() << " is out of qr!" << std::endl;
 	#ifdef REDIRECT_OUTPUT
-	std::cout.rdbuf(coutbuf); //reset to standard output again
+	std::cerr.rdbuf(coutbuf); //reset to standard output again
 	out.close();
 	#endif
 }
