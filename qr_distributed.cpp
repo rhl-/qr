@@ -19,7 +19,7 @@
 #include "io.h"
 #include "qr_distributed.h"
 #include "util.h"
-
+#define REDIRECT_OUTPUT
 namespace ublas = boost::numeric::ublas;
 namespace po = boost::program_options;
 namespace mpi = boost::mpi;
@@ -44,8 +44,8 @@ int main( int argc, char * argv[]){
 	std::stringstream ss;
 	ss << "out." << data.world.rank();
 	std::ofstream out(ss.str().c_str());
-        std::streambuf *coutbuf = std::cout.rdbuf(); //save old buf
-        std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
+        std::streambuf *coutbuf = std::cerr.rdbuf(); //save old buf
+        std::cerr.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
 	#endif
 
 	//read input
