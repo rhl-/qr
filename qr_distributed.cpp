@@ -50,13 +50,19 @@ int main( int argc, char * argv[]){
         std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
 	#endif
 	data.world.barrier();
-
+	std::cout << env.processor_name() << " <----> " 
+		  << data.world.rank() << std::flush << std::endl;
+	
 	//read input
 	po::variables_map vm;
 	t10::process_args( argc, argv, vm);
 	std::string filename( vm[ "input-file"].as< std::string>());
+	std::cout << "read matrix";
 	t10::read_matrix( filename, data);
+	std::cout << "... done" << std::endl 
+		  << "building communicators";
 	t10::construct_communicators( data);
+  	std::cout << "... done" << std::endl;	
 	/*std::cout << data.world.rank() 
 		  << " has a " 
 		  << data.M.size1() << " x " << data.M.size2() 

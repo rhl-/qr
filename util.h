@@ -75,6 +75,7 @@ namespace t10 {
 
 	template< typename Matrix_data>
 	void construct_communicators( Matrix_data & data){
+		std::cout << std::endl;
 		typedef typename Matrix_data::Communicator Communicator;
 		typedef typename std::vector< std::size_t> Vector;
 		typedef typename Vector::iterator Iterator;
@@ -106,6 +107,9 @@ namespace t10 {
 		std::sort (row.begin(),   row.end()); 
 		std::sort (col.begin(),   col.end()); 
 		
+		std::cout << "row: " << row << std::endl;
+		std::cout << "col: " << col << std::endl;
+
 		//communicators along row of this processor 
 		//(for propagating right multiplication)
 		Vector_comm  & row_comm = data.row_comm;
@@ -118,6 +122,7 @@ namespace t10 {
 		const std::size_t one = 1;
 		for (std::size_t k = 0; k < std::max(data.block_col,one); ++k) {
 		    Vector srow( row.begin()+k, row.end());
+		    std::cout << "srow: " << srow << std::endl;
 		    mpi::group row_group = t10::create_group(world, srow);
 		    row_comm.push_back( mpi::communicator( world, row_group));
 		    data.row.push_back( srow);
@@ -125,6 +130,7 @@ namespace t10 {
  		
 		for (std::size_t k = 0; k < std::max(data.block_row,one); ++k) {
 		    Vector scol( col.begin()+k, col.end()); 
+		    std::cout << "scol: " << scol << std::endl;
 		    mpi::group col_group = t10::create_group(world, scol);
 		    col_comm.push_back( mpi::communicator( world, col_group));
 		    data.col.push_back( scol);

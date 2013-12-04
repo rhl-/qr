@@ -255,11 +255,21 @@ namespace t10 {
 	    for (std::size_t k = 0; k < n-2; ++k){
 		const std::size_t col_idx = block_column_index(k, p, n);
 		std::cout << "k: " << k << std::endl; 
-		if ( data.block_col < col_idx ){ return; }
+		if ( data.block_col < col_idx ){ 
+			std::cout << "returning" << std::endl; 
+			return; 
+		}
 		if (data.block_col == col_idx && data.block_row >= col_idx){
-		   if(data.diag() && k == data.last_col-1){ return; }
+		   if(data.diag() && k == data.last_col-1){ 
+			std::cout << "returning" << std::endl; 
+			return; 
+		    }
+		   std::cout << "dist_reduce_col" << std::endl; 
 		   dist_reduce_column( data, k);
-		}else{ apply_householder( data, k); }
+		}else{ 
+		   	std::cout << "apply_householder" << std::endl; 
+			apply_householder( data, k); 
+		}
 		std::cerr << print_matrix( data.M) << std::endl; 
 	   }
 		std::cerr << print_matrix( data.M) << std::endl; 
