@@ -45,8 +45,10 @@ int main( int argc, char * argv[]){
 	std::stringstream ss;
 	ss << "out." << data.world.rank();
 	std::ofstream out(ss.str().c_str());
-        std::streambuf *coutbuf = std::cerr.rdbuf(); //save old buf
-        std::cerr.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
+        std::streambuf *cerrbuf = std::cerr.rdbuf(); //save old buf
+        std::streambuf *coutbuf = std::cout.rdbuf(); //save old buf
+        std::cerr.rdbuf(out.rdbuf()); //redirect std::cerr to out.txt!
+        std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
 	#endif
 
 	//read input
@@ -65,7 +67,8 @@ int main( int argc, char * argv[]){
 	t10::parallel::qr( data);
 	std::cerr << data.world.rank() << " is out of qr!" << std::endl;
 	#ifdef REDIRECT_OUTPUT
-	std::cerr.rdbuf(coutbuf); //reset to standard output again
+	std::cerr.rdbuf(cerrbuf); //reset to standard output again
+	std::cout.rdbuf(coutbuf); //reset to standard output again
 	out.close();
 	#endif
 }
