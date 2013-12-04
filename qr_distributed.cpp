@@ -17,8 +17,10 @@
 
 //PROJECT
 #include "io.h"
-#include "qr_distributed.h"
 #include "util.h"
+#include "communicators.h"
+#include "qr_distributed.h"
+
 #define REDIRECT_OUTPUT
 namespace ublas = boost::numeric::ublas;
 namespace po = boost::program_options;
