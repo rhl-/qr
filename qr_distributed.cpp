@@ -38,7 +38,6 @@ int main( int argc, char * argv[]){
 	//initialize mpi
 	mpi::environment env(argc, argv);
 	Matrix_data data;
-	data.world.barrier();
 	std::cout << env.processor_name() << " <----> " 
 		  << data.world.rank() << std::flush << std::endl;
 	#ifdef REDIRECT_OUTPUT
@@ -50,6 +49,7 @@ int main( int argc, char * argv[]){
         std::cerr.rdbuf(out.rdbuf()); //redirect std::cerr to out.txt!
         std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
 	#endif
+	data.world.barrier();
 
 	//read input
 	po::variables_map vm;

@@ -101,12 +101,15 @@ namespace t10 {
 	const bool on_last_column = ((data.row_length-block_col)==1);
 	const bool serial = (on_boundary_column && on_penultimate_column) 
 				|| on_last_column;
+	
 
 	//Step 0.5: Create Left Householder Vector of appropriate size
 	Vector vb_left( M.size1()+1, 0);
 
 	//Step 1: If there is data to receive, grab it	
-	if( !last_row ){mpi::broadcast( data.row_comm[ block_col], vb_left, 0);}
+	if( !last_row ){ 
+		mpi::broadcast( data.row_comm[ block_col], vb_left, 0);
+	}
 	Vector v_left = ublas::subrange(vb_left, 1, vb_left.size());
         
 	//Step 1.5: create a Right Householder Vector of appropriate size
@@ -118,17 +121,22 @@ namespace t10 {
 	Vector v_right = ublas::subrange(vb_right, 1, vb_right.size());
 	const Value beta = vb_right[ 0];
 	//Step 3: Apply the right householder matrix, sometimes in serial
-	if( !serial){
+	if( serial){
+	     std::cout << "id: " << data.world.rank() 
+	      	       << " applying: " << v_right << " on the right in serial"
+		       << std::endl;
+	    serial::apply_householder_right( beta, v_right, M, 
+					     column_index*(on_the_left), 
+				             on_the_left);
+	} else { 
+	    //When we are on a boundary column one less processor is involved.
+	    const std::size_t comm_idx = block_col + on_boundary_column;
 	    apply_householder_right( beta, 
 	   			 M, column_index, 
 	   			 v_right, 
-	   			 data.row_comm[ block_col+on_boundary_column],
+	   			 data.row_comm[ comm_idx],
 	   			 data.world.rank(),
 				 on_the_left);
-	} else { 
-		serial::apply_householder_right( beta, v_right, M, 
-						 column_index*(on_the_left), 
-						 on_the_left);
 	}
 
 	//Step 4: Apply the left householder matrix, sometimes in serial	
@@ -168,9 +176,11 @@ namespace t10 {
 	     const bool on_last_col = (k == data.last_col-1);
 	     const bool penult_blck_col = (data.block_col == data.row_length-2);
 	     const bool last_block_col = (data.block_col == data.row_length-1);
+	     const bool penult_boundary_col = (on_last_col && penult_blck_col);
+	     const bool serial = penult_boundary_col || last_block_col;
 	     //Step 1: Compute Householder Vector
 	     //These special cases allow for serial computation
-	     if ( (on_last_col && penult_blck_col) || last_block_col){
+	     if ( serial){
 		serial::compute_householder_vector( v_left);
 		beta = v_left[0]; v_left[0]=1;
 	     } else { //Otherwise there is parallel computation
@@ -179,6 +189,9 @@ namespace t10 {
 	      beta = compute_householder_vector( v_left, 
 					data.col_comm[ col_comm_idx]);
 	     }
+	     std::cout << "id: " << data.world.rank() 
+		       << " created: " 
+		       << v_left << std::endl;	
 	     //Step 2: Package and send householder vector 
 	     //        used for left householder applications 
 	     //        across current active row 
@@ -191,31 +204,47 @@ namespace t10 {
 	     //        vector for right applications
 	     if (last_block_col){
 		 mpi::broadcast( data.col_comm[ 0], w, col_root); 
-	     } else if(!(on_last_col && penult_blck_col)) {
+	     } else if(!penult_boundary_col) {
 	         const std::size_t col_comm_idx = comm_idx+on_last_col;
 		 mpi::broadcast( data.col_comm[ col_comm_idx], w, 0); 
 	     }
 	     Vector v_right = ublas::subrange(w, 1, w.size());
+	     std::cout << "id: " << data.world.rank() 
+		       << " recv'd: " 
+		       << v_right << std::endl;	
 	     //Step 4: Apply Householder on the right, sometimes in serial
 	     const bool on_the_left = (comm_idx == data.block_col); 
-	     if( !last_block_col){
-	     apply_householder_right( beta, M, column_index, v_right,
+	     if( last_block_col){
+	     std::cout << "id: " << data.world.rank() 
+	      	       << " applying: " << v_left << " on the right in serial"
+		       << std::endl;
+		serial::apply_householder_right( beta, v_left, M, 
+						 column_index, on_the_left);
+	     }else if(!penult_boundary_col){
+		std::cout << "id: " << data.world.rank() 
+	      	       << " applying: " << v_right << " on the right in parallel"
+		       << std::endl;
+	      apply_householder_right( beta, M, column_index, v_right,
 				      	 data.row_comm[ comm_idx], 
 					 data.world.rank(), 
 					 on_the_left);
-	     }else{
-	      serial::apply_householder_right( beta, v_left, M, column_index);
 	     }
-
 	     //Step 5: Apply householder on the left, sometimes in serial
-	     if(!(on_last_col && penult_blck_col)) {
-	     const bool on_the_top = (comm_idx == data.block_row); 
+	     if( serial) {
+		if(penult_boundary_col){ return; }
+		std::cout << "id: " << data.world.rank() 
+	      	       << " applying: " << v_left << " on the left in serial"
+		       << std::endl;
+		serial::apply_householder_left( beta, v_left, M, column_index);
+	     } else{
+		std::cout << "id: " << data.world.rank() 
+	      	       << " applying: " << v_left << " on the left in parallel"
+		       << std::endl;
+	     const bool on_the_top = (comm_idx == data.block_row);
 	     apply_householder_left( beta,  M, column_index,  v_left,
 				     data.col_comm[ 0], 
 				     data.world.rank(), on_the_top);
-	    }else{
-	      //serial::apply_householder_left( beta, v_left, M, column_index,);
-	    }
+	     }
 	}
 	template< typename Matrix_data>
 	void hessenberg( Matrix_data & data){
@@ -225,7 +254,7 @@ namespace t10 {
 	    //Algorithm 7.4.2 GVL
 	    for (std::size_t k = 0; k < n-2; ++k){
 		const std::size_t col_idx = block_column_index(k, p, n);
-		if (id == 1){ std::cout << "k: " << k << std::endl; }
+		std::cout << "k: " << k << std::endl; 
 		if ( data.block_col < col_idx ){ return; }
 		if (data.block_col == col_idx && data.block_row >= col_idx){
 		   if(data.diag() && k == data.last_col-1){ return; }
