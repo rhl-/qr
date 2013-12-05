@@ -7,6 +7,7 @@
 //STL
 #include <algorithm>
 #include <numeric>
+#include <functional>   // std::multiplies
 
 #include "util.h"
 
@@ -49,11 +50,27 @@ struct Matrix_data {
 }; // struct Matrix_data
 
 
-template< typename Communicator, typename Vector> 
+template< typename Communicator, typename Iterator> 
 boost::mpi::group create_group( const Communicator & world, 
-					   const Vector & v){ 
-	return world.group().include(v.begin(), v.end()); 
+				const Iterator & begin,
+				const Iterator & end){ 
+	return world.group().include(begin, end); 
 }
+
+template< typename Iterator, typename T>
+Iterator vec_add( Iterator begin, Iterator end, const T & t){
+	return std::transform( begin, end, begin, 
+			       std::bind2nd( std::plus<T>(), t) );
+}
+
+
+template< typename Iterator, typename T>
+Iterator vec_multiply( Iterator begin, Iterator end, const T & t){
+	return std::transform( begin, end, begin, 
+			       std::bind2nd( std::multiplies<T>(), t) );
+}
+
+
 
 template< typename Matrix_data>
 void construct_communicators( Matrix_data & data){
@@ -61,9 +78,7 @@ void construct_communicators( Matrix_data & data){
 	mpi::timer t;
 	typedef typename Matrix_data::Communicator Communicator;
 	typedef typename Matrix_data::Vector_comm Vector_comm;
-	typedef typename Vector_comm::iterator Comm_iterator;
 	typedef typename std::vector< std::size_t> Vector;
-	typedef typename Vector::iterator Iterator;
 
 	const Communicator & world = data.world;
 	const std::size_t id = world.rank();
@@ -72,27 +87,9 @@ void construct_communicators( Matrix_data & data){
 	const std::size_t r = row_id( id, row_length);
 	const std::size_t c = col_id( id, row_length);
 	
-	data.partner = index_to_id( c,r,  row_length);
+	data.partner = index_to_id( c, r,  row_length);
 	data.row_length = row_length;
-	std::cout  << "elapsed " << t.elapsed() << std::endl;
-	t.restart();
 	
-	Vector row( row_length, id);
-	Vector col( row_length, id);
-	//create row and column mpi group indices
-	//for proc and its partner
-	for(Iterator i = row.begin(), j = col.begin(); 
-		     i != row.end(); ++i, ++j){
-		const std::size_t idx = std::distance(row.begin(), i);
-		*i = r*row_length + idx; //row
-		*j = idx*row_length + c; //col 
-	}
-	std::sort (row.begin(),   row.end()); 
-	std::sort (col.begin(),   col.end()); 
-	
-	std::cout << "row: " << row << std::endl;
-	std::cout << "col: " << col << std::endl;
-
 	//communicators along row of this processor 
 	//(for propagating right multiplication)
 	Vector_comm  & row_comm = data.row_comm;
@@ -100,8 +97,6 @@ void construct_communicators( Matrix_data & data){
 	//(for propagating left multiplication)
 	Vector_comm  & col_comm = data.col_comm;
 
-	std::cout  << "elapsed " << t.elapsed() << std::endl;
-	t.restart();
 	//now moving down the "diagonal" remove stuff from each
 	//group making communicators	
 	const std::size_t one = 1;
@@ -110,34 +105,42 @@ void construct_communicators( Matrix_data & data){
 	const std::size_t num_row_comm = data.block_col+1-
 					(data.block_col == row_length-1);
 	row_comm.reserve( num_row_comm);
-	col_comm.reserve( num_col_comm); 
-	for (std::size_t k = 0; k < num_row_comm; ++k) {
-	    Vector srow( row.begin()+k, row.end());
-	    std::cout << "srow: " << srow << std::flush;
-	    mpi::group row_group = t10::create_group(world, srow);
-	    std::cout << " group created" << std::endl;
-	    std::cout << "col_comm size: " << row_comm.size() << "/" 
-		      << num_row_comm << std::endl;
-	    std::cout << " creating comm" << std::flush;
-	    row_comm.emplace_back( world, row_group);
-	    std::cout << " ...created!" << std::endl;
+	for (std::size_t i = 0; i < row_length; ++i){
+		Vector row(row_length,0);
+		std::iota( row.begin(), row.end(), i*row_length);
+		for( std::size_t j = 0; j < row_length-1; ++j){
+			Vector tmp( row.begin()+j, row.end());
+			mpi::group row_group = t10::create_group( world,
+								  row.begin()+j,
+								  row.end());
+			mpi::communicator comm( world, row_group);
+			if( std::binary_search( row.begin()+j, row.end(), id)){ 
+			   std::cout << "cur row: " << tmp << std::flush;
+			   row_comm.emplace_back( comm, mpi::comm_attach);
+			   std::cout << "... created" << std::endl;
+			}
+		}
 	}
-
-	std::cout  << "elapsed " << t.elapsed() << std::endl;
-	t.restart();
-	for (std::size_t k = 0; k < num_col_comm; ++k) {
-	    Vector scol( col.begin()+k, col.end()); 
-	    std::cout << "scol: " << scol << std::flush;
-	    mpi::group col_group = t10::create_group(world, scol);
-	    std::cout << " group created" << std::endl;
-	    std::cout << "col_comm size: " << col_comm.size() 
-		      << "/" << num_col_comm << std::endl;
-	    std::cout << " creating comm" << std::flush;
-	    col_comm.emplace_back( world, col_group);
-	    std::cout << " ...created!" << std::endl;
+	col_comm.reserve( num_col_comm);
+	for (std::size_t i = 0; i < row_length; ++i){
+		Vector col(row_length,0);
+		std::iota( col.begin(), col.end(), 0);
+		t10::vec_multiply( col.begin(), col.end(), 3);
+		t10::vec_add( col.begin(), col.end(), i);
+		for( std::size_t j = 0; j < row_length-1; ++j){
+			Vector tmp( col.begin()+j, col.end());
+			mpi::group col_group = t10::create_group( world,
+								  col.begin()+j,
+								  col.end());
+			mpi::communicator comm( world, col_group);
+			if( std::binary_search( col.begin()+j, col.end(), id)){ 
+			    std::cout << "cur col: " << tmp << std::flush;
+			    col_comm.emplace_back( comm, mpi::comm_attach);
+			    std::cout << "... created" << std::endl;
+			}
+		
+		}
 	}
-	std::cout  << "elapsed " << t.elapsed() << std::endl;
-	t.restart();
 }
 } //end namespace 10
 #endif

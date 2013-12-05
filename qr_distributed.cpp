@@ -79,7 +79,7 @@ int main( int argc, char * argv[]){
 	if (data.world.rank() == 0){ 
 		std::cout << "--------------------" << std::endl << std::flush;
 	}*/
-	t10::parallel::qr( data);
+	//t10::parallel::qr( data);
 	std::cerr << data.world.rank() << " is out of qr!" << std::endl;
 	std::cerr << t10::print_matrix( data.M) << std::endl;
 	#ifdef REDIRECT_OUTPUT
