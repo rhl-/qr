@@ -42,7 +42,8 @@ struct Matrix_data {
 	* Below is a list of communicators
 	*/ 	
 	_Communicator world;
-	
+
+	//by default these should be empty.	
 	Vector_comm col_comm;
 	Vector_comm row_comm;
 }; // struct Matrix_data
@@ -104,21 +105,36 @@ void construct_communicators( Matrix_data & data){
 	//now moving down the "diagonal" remove stuff from each
 	//group making communicators	
 	const std::size_t one = 1;
-	row_comm.reserve( std::max(data.block_col,one));
-	col_comm.reserve( std::max(data.block_row,one));
-	for (std::size_t k = 0; k < std::max(data.block_col,one); ++k) {
+	const std::size_t num_col_comm = data.block_row+1-
+					(data.block_row == row_length-1);
+	const std::size_t num_row_comm = data.block_col+1-
+					(data.block_col == row_length-1);
+	row_comm.reserve( num_row_comm);
+	col_comm.reserve( num_col_comm); 
+	for (std::size_t k = 0; k < num_row_comm; ++k) {
 	    Vector srow( row.begin()+k, row.end());
-	    std::cout << "srow: " << srow << std::endl;
+	    std::cout << "srow: " << srow << std::flush;
 	    mpi::group row_group = t10::create_group(world, srow);
-	    row_comm.emplace_back( mpi::communicator( world, row_group));
+	    std::cout << " group created" << std::endl;
+	    std::cout << "col_comm size: " << row_comm.size() << "/" 
+		      << num_row_comm << std::endl;
+	    std::cout << " creating comm" << std::flush;
+	    row_comm.emplace_back( world, row_group);
+	    std::cout << " ...created!" << std::endl;
 	}
+
 	std::cout  << "elapsed " << t.elapsed() << std::endl;
 	t.restart();
-	for (std::size_t k = 0; k < std::max(data.block_row,one); ++k) {
+	for (std::size_t k = 0; k < num_col_comm; ++k) {
 	    Vector scol( col.begin()+k, col.end()); 
-	    std::cout << "scol: " << scol << std::endl;
+	    std::cout << "scol: " << scol << std::flush;
 	    mpi::group col_group = t10::create_group(world, scol);
-	    col_comm.emplace_back( mpi::communicator( world, col_group));
+	    std::cout << " group created" << std::endl;
+	    std::cout << "col_comm size: " << col_comm.size() 
+		      << "/" << num_col_comm << std::endl;
+	    std::cout << " creating comm" << std::flush;
+	    col_comm.emplace_back( world, col_group);
+	    std::cout << " ...created!" << std::endl;
 	}
 	std::cout  << "elapsed " << t.elapsed() << std::endl;
 	t.restart();

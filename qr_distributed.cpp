@@ -14,6 +14,7 @@
 //BOOST MPI
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
+#include <boost/mpi/timer.hpp>
 
 //PROJECT
 #include "io.h"
@@ -39,9 +40,11 @@ typedef t10::Matrix_data< Matrix, Communicator> Matrix_data;
 int main( int argc, char * argv[]){
 	//initialize mpi
 	mpi::environment env(argc, argv);
+	mpi::timer t;
 	Matrix_data data;
 	std::cout << env.processor_name() << " <----> " 
-		  << data.world.rank() << std::flush << std::endl;
+		  << data.world.rank() << " " << t.elapsed()
+		  << std::flush << std::endl;
 	#ifdef REDIRECT_OUTPUT
 	std::stringstream ss;
 	ss << "out." << data.world.rank();
@@ -51,20 +54,24 @@ int main( int argc, char * argv[]){
         std::cerr.rdbuf(out.rdbuf()); //redirect std::cerr to out.txt!
         std::cout.rdbuf(out.rdbuf()); //redirect std::cout to out.txt!
 	#endif
-	data.world.barrier();
 	std::cout << env.processor_name() << " <----> " 
-		  << data.world.rank() << std::flush << std::endl;
-	
+		  << data.world.rank() << " " << t.elapsed()
+		  <<  std::flush << std::endl;
+	t.restart();
+	data.world.barrier();
+	std::cout << "barrier took: " << t.elapsed() << std::endl;	
 	//read input
+	t.restart();
 	po::variables_map vm;
 	t10::process_args( argc, argv, vm);
 	std::string filename( vm[ "input-file"].as< std::string>());
-	std::cout << "read matrix";
+	std::cout << "read matrix" << std::flush;
 	t10::read_matrix( filename, data);
-	std::cout << "... done" << std::endl 
-		  << "building communicators";
+	std::cout << "... done " << t.elapsed() << std::endl 
+		  << "building communicators" << std::flush;
+	t.restart();
 	t10::construct_communicators( data);
-  	std::cout << "... done" << std::endl;	
+  	std::cout << "... done " << t.elapsed() << std::endl;	
 	/*std::cout << data.world.rank() 
 		  << " has a " 
 		  << data.M.size1() << " x " << data.M.size2() 
@@ -74,6 +81,7 @@ int main( int argc, char * argv[]){
 	}*/
 	t10::parallel::qr( data);
 	std::cerr << data.world.rank() << " is out of qr!" << std::endl;
+	std::cerr << t10::print_matrix( data.M) << std::endl;
 	#ifdef REDIRECT_OUTPUT
 	std::cerr.rdbuf(cerrbuf); //reset to standard output again
 	std::cout.rdbuf(coutbuf); //reset to standard output again
