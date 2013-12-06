@@ -81,6 +81,7 @@ namespace t10 {
 
 	template< typename Matrix_data>
 	void apply_householder( Matrix_data & data, const std::size_t & k){ 
+	std::cout << "apply_householder" << std::endl;
 	typedef typename Matrix_data::Communicator Communicator; 
 	typedef typename Matrix_data::Matrix Matrix; 
 	typedef typename Matrix::value_type Value;
@@ -88,6 +89,10 @@ namespace t10 {
 	typedef typename std::pair< Value, Vector> Pair;
 	const std::size_t block_col = block_column_index( k, data.row_length, 
 								      data.n);
+	const std::size_t next_block_col=block_column_index( k+1, 
+							     data.row_length, 
+								      data.n);
+
 	const std::size_t column_index = local_column_index( k, data.row_length,
 								 data.n);
 	const std::size_t col_root = data.block_col;
@@ -95,19 +100,18 @@ namespace t10 {
 	//Step 0: Check all the special cases
 	const bool last_row = (k >= data.last_row-1);	
 	const bool on_the_left = (block_col == data.block_col);
-	const bool on_boundary_column = (k == (data.first_col-1));
-
+	const bool on_boundary_column = (block_col != next_block_col); 
 	const bool on_penultimate_column = ((data.row_length-block_col)==2);
 	const bool on_last_column = ((data.row_length-block_col)==1);
-	const bool serial = (on_boundary_column && on_penultimate_column) 
-				|| on_last_column;
+	const bool serial = (on_penultimate_column && on_boundary_column) || 
+			    on_last_column;
 	
-
 	//Step 0.5: Create Left Householder Vector of appropriate size
 	Vector vb_left( M.size1()+1, 0);
 
 	//Step 1: If there is data to receive, grab it	
 	if( !last_row ){ 
+		std::cout << "row bcast" << std::endl;
 		mpi::broadcast( data.row_comm[ block_col], vb_left, 0);
 	}
 	Vector v_left = ublas::subrange(vb_left, 1, vb_left.size());
@@ -117,7 +121,9 @@ namespace t10 {
 	vb_right.resize( M.size1()+1, M.size1()==M.size2());
 
 	//Step 2: Send/Receive the vector necessary for right applications
+	std::cout << "col bcast" << std::flush;
 	mpi::broadcast( data.col_comm[ 0],  vb_right, col_root);
+	std::cout << "... done" << std::endl;
 	Vector v_right = ublas::subrange(vb_right, 1, vb_right.size());
 	const Value beta = vb_right[ 0];
 	//Step 3: Apply the right householder matrix, sometimes in serial
@@ -128,9 +134,12 @@ namespace t10 {
 	    serial::apply_householder_right( beta, v_right, M, 
 					     column_index*(on_the_left), 
 				             on_the_left);
-	} else { 
-	    //When we are on a boundary column one less processor is involved.
+	} else {
 	    const std::size_t comm_idx = block_col + on_boundary_column;
+	    std::cout << "before right apply_householder" << std::endl; 
+	    std::cout << "data.row_comm.size(): " << data.row_comm.size() << std::endl;
+	    std::cout << "comm_idx: " << comm_idx << std::endl;
+	    //When we are on a boundary column one less processor is involved.
 	    apply_householder_right( beta, 
 	   			 M, column_index, 
 	   			 v_right, 
@@ -141,13 +150,16 @@ namespace t10 {
 
 	//Step 4: Apply the left householder matrix, sometimes in serial	
 	if (!last_row && serial){ 
+	      std::cout << "serial left apply_householder" << std::endl; 
 		serial::apply_householder_left( beta, v_left, M, 0, 0); 
 		return;
 	}
 	if ( !last_row ) {
+	    std::cout << "before left apply_householder" << std::endl; 
 	    const bool on_the_top = (block_col == data.block_row); 
+	    const std::size_t comm_idx = block_col + on_boundary_column;
 	    apply_householder_left( beta, M, column_index,
-				    v_left, data.col_comm[ block_col],
+				    v_left, data.col_comm[ comm_idx],
 	   			    data.world.rank(),
 				    on_the_top,
 				    block_col >= data.block_col);
@@ -156,6 +168,7 @@ namespace t10 {
 	
 	template< typename Matrix_data>
 	void dist_reduce_column( Matrix_data & data, const std::size_t & k){
+	     std::cout << "dist_reduce_column" << std::endl;
 	     typedef typename Matrix_data::Matrix Matrix;
 	     typedef typename Matrix::value_type Value;
 	     typedef typename ublas::matrix_column< Matrix> Matrix_column;
@@ -166,6 +179,10 @@ namespace t10 {
 	     const std::size_t column_offset = data.diag()*(column_index+1);
 	     const std::size_t comm_idx=
 				block_column_index( k, data.row_length, data.n);
+	     const std::size_t next_block_col=block_column_index( k+1, 
+							     data.row_length, 
+								      data.n);
+	     const bool on_boundary_column = (comm_idx != next_block_col);
 	     const std::size_t col_root = data.block_col;
 	     //Step 0: Build Output Structures
 	     Matrix_column col(M, column_index);
@@ -180,12 +197,12 @@ namespace t10 {
 	     const bool serial = penult_boundary_col || last_block_col;
 	     //Step 1: Compute Householder Vector
 	     //These special cases allow for serial computation
+	     const std::size_t col_comm_idx = comm_idx+on_last_col;
 	     if ( serial){
 		serial::compute_householder_vector( v_left);
 		beta = v_left[0]; v_left[0]=1;
 	     } else { //Otherwise there is parallel computation
 	      //However when on_last_col, one less processor is involved
-	      const std::size_t col_comm_idx = comm_idx+on_last_col;
 	      beta = compute_householder_vector( v_left, 
 					data.col_comm[ col_comm_idx]);
 	     }
@@ -202,28 +219,25 @@ namespace t10 {
 	     }
 	     //Step 3: Send/Receive Package containing
 	     //        vector for right applications
-	     if (last_block_col){
-		 mpi::broadcast( data.col_comm[ 0], w, col_root); 
-	     } else if(!penult_boundary_col) {
-	         const std::size_t col_comm_idx = comm_idx+on_last_col;
-		 mpi::broadcast( data.col_comm[ col_comm_idx], w, 0); 
-	     }
+	     if (!on_boundary_column){
+		 mpi::broadcast( data.col_comm[ 0], w, col_root);
+	     } 
 	     Vector v_right = ublas::subrange(w, 1, w.size());
 	     std::cout << "id: " << data.world.rank() 
 		       << " recv'd: " 
 		       << v_right << std::endl;	
 	     //Step 4: Apply Householder on the right, sometimes in serial
 	     const bool on_the_left = (comm_idx == data.block_col); 
-	     if( last_block_col){
+	    if( !on_last_col && last_block_col){
 	     std::cout << "id: " << data.world.rank() 
 	      	       << " applying: " << v_left << " on the right in serial"
 		       << std::endl;
 		serial::apply_householder_right( beta, v_left, M, 
 						 column_index, on_the_left);
-	     }else if(!penult_boundary_col){
+	     }else if(!on_last_col && !penult_boundary_col){
 		std::cout << "id: " << data.world.rank() 
-	      	       << " applying: " << v_right << " on the right in parallel"
-		       << std::endl;
+	      	      << " applying: " << v_right << " on the right in parallel"
+		      << std::endl;
 	      apply_householder_right( beta, M, column_index, v_right,
 				      	 data.row_comm[ comm_idx], 
 					 data.world.rank(), 
@@ -231,7 +245,15 @@ namespace t10 {
 	     }
 	     //Step 5: Apply householder on the left, sometimes in serial
 	     if( serial) {
-		if(penult_boundary_col){ return; }
+		if(penult_boundary_col){ 
+			ublas::matrix_column< Matrix> pv(M, M.size2()-1);
+			const Value sign = (pv[ 0] < 0)?-1:1;
+			const Value beta = sign*ublas::norm_2(pv);
+			std::cout << "beta will be: " << beta << std::endl;
+			pv( 0) = beta;
+			std::fill(pv.begin()+1,pv.end(),0.0f);
+			return; 
+		}
 		std::cout << "id: " << data.world.rank() 
 	      	       << " applying: " << v_left << " on the left in serial"
 		       << std::endl;
@@ -242,7 +264,7 @@ namespace t10 {
 		       << std::endl;
 	     const bool on_the_top = (comm_idx == data.block_row);
 	     apply_householder_left( beta,  M, column_index,  v_left,
-				     data.col_comm[ 0], 
+				     data.col_comm[ col_comm_idx], 
 				     data.world.rank(), on_the_top);
 	     }
 	}
@@ -254,25 +276,16 @@ namespace t10 {
 	    //Algorithm 7.4.2 GVL
 	    for (std::size_t k = 0; k < n-2; ++k){
 		const std::size_t col_idx = block_column_index(k, p, n);
-		std::cout << "k: " << k << std::endl; 
-		if ( data.block_col < col_idx ){ 
-			std::cout << "returning" << std::endl; 
-			return; 
-		}
+		std::cout << "k: " << k << std::endl
+			  << print_matrix( data.M) << std::endl; 
+		const bool on_last_col = (k == data.last_col-1); 
+		if (data.block_col < col_idx){ return; }
+		if (on_last_col && data.diag()) { return; }
+		if (on_last_col && data.above() && col_idx < p-1) { return; } 
 		if (data.block_col == col_idx && data.block_row >= col_idx){
-		   if(data.diag() && k == data.last_col-1){ 
-			std::cout << "returning" << std::endl; 
-			return; 
-		    }
-		   std::cout << "dist_reduce_col" << std::endl; 
 		   dist_reduce_column( data, k);
-		}else{ 
-		   	std::cout << "apply_householder" << std::endl; 
-			apply_householder( data, k); 
-		}
-		std::cerr << print_matrix( data.M) << std::endl; 
+	 	} else{ apply_householder( data, k); }
 	   }
-		std::cerr << print_matrix( data.M) << std::endl; 
 	}
 
 } //end namespace parallel

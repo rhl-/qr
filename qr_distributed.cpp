@@ -1,3 +1,4 @@
+#define REDIRECT_OUTPUT
 //STL
 #include <iostream>
 #include <algorithm>
@@ -22,7 +23,6 @@
 #include "communicators.h"
 #include "qr_distributed.h"
 
-#define REDIRECT_OUTPUT
 namespace ublas = boost::numeric::ublas;
 namespace po = boost::program_options;
 namespace mpi = boost::mpi;
@@ -47,7 +47,7 @@ int main( int argc, char * argv[]){
 		  << std::flush << std::endl;
 	#ifdef REDIRECT_OUTPUT
 	std::stringstream ss;
-	ss << "out." << data.world.rank();
+	ss << "output/out." << data.world.rank();
 	std::ofstream out(ss.str().c_str());
         std::streambuf *cerrbuf = std::cerr.rdbuf(); //save old buf
         std::streambuf *coutbuf = std::cout.rdbuf(); //save old buf
@@ -78,13 +78,16 @@ int main( int argc, char * argv[]){
 		  << std::endl << std::flush;
 	if (data.world.rank() == 0){ 
 		std::cout << "--------------------" << std::endl << std::flush;
-	}*/
-	//t10::parallel::qr( data);
+	}
+	*/
+	t10::parallel::qr( data);
 	std::cerr << data.world.rank() << " is out of qr!" << std::endl;
 	std::cerr << t10::print_matrix( data.M) << std::endl;
+	std::cout << "-------------------------------" << std::endl << std::endl;
 	#ifdef REDIRECT_OUTPUT
 	std::cerr.rdbuf(cerrbuf); //reset to standard output again
 	std::cout.rdbuf(coutbuf); //reset to standard output again
 	out.close();
 	#endif
+	return 0;
 }

@@ -74,7 +74,6 @@ Iterator vec_multiply( Iterator begin, Iterator end, const T & t){
 
 template< typename Matrix_data>
 void construct_communicators( Matrix_data & data){
-	std::cout << std::endl;
 	mpi::timer t;
 	typedef typename Matrix_data::Communicator Communicator;
 	typedef typename Matrix_data::Vector_comm Vector_comm;
@@ -100,46 +99,24 @@ void construct_communicators( Matrix_data & data){
 	//now moving down the "diagonal" remove stuff from each
 	//group making communicators	
 	const std::size_t one = 1;
-	const std::size_t num_col_comm = data.block_row+1-
-					(data.block_row == row_length-1);
-	const std::size_t num_row_comm = data.block_col+1-
-					(data.block_col == row_length-1);
-	row_comm.reserve( num_row_comm);
-	for (std::size_t i = 0; i < row_length; ++i){
-		Vector row(row_length,0);
-		std::iota( row.begin(), row.end(), i*row_length);
-		for( std::size_t j = 0; j < row_length-1; ++j){
-			Vector tmp( row.begin()+j, row.end());
-			mpi::group row_group = t10::create_group( world,
-								  row.begin()+j,
-								  row.end());
-			mpi::communicator comm( world, row_group);
-			if( std::binary_search( row.begin()+j, row.end(), id)){ 
-			   std::cout << "cur row: " << tmp << std::flush;
-			   row_comm.emplace_back( comm, mpi::comm_attach);
-			   std::cout << "... created" << std::endl;
-			}
-		}
+	row_comm.reserve( row_length-1);
+	col_comm.reserve( row_length-1);
+	mpi::communicator row = world.split( data.block_row);
+	mpi::communicator col = world.split( data.block_col);
+	row_comm.emplace_back( row, mpi::comm_duplicate);
+	col_comm.emplace_back( col, mpi::comm_duplicate);
+	std::array< std::size_t, 1> ids = {0};
+	for( std::size_t i = 1; i < row_length; ++i){
+		if (!row_comm[i-1]) { std::cerr << "row comm is invalid!" << std::endl;}
+		mpi::communicator next = row_comm[ i-1].split( row_comm[i-1].rank()>0);
+		if (next.size() == 1){ break; }
+		row_comm.emplace_back( next, mpi::comm_duplicate);
 	}
-	col_comm.reserve( num_col_comm);
-	for (std::size_t i = 0; i < row_length; ++i){
-		Vector col(row_length,0);
-		std::iota( col.begin(), col.end(), 0);
-		t10::vec_multiply( col.begin(), col.end(), 3);
-		t10::vec_add( col.begin(), col.end(), i);
-		for( std::size_t j = 0; j < row_length-1; ++j){
-			Vector tmp( col.begin()+j, col.end());
-			mpi::group col_group = t10::create_group( world,
-								  col.begin()+j,
-								  col.end());
-			mpi::communicator comm( world, col_group);
-			if( std::binary_search( col.begin()+j, col.end(), id)){ 
-			    std::cout << "cur col: " << tmp << std::flush;
-			    col_comm.emplace_back( comm, mpi::comm_attach);
-			    std::cout << "... created" << std::endl;
-			}
-		
-		}
+	for( std::size_t i = 1; i < row_length; ++i){
+		if (!col_comm[ i-1]) { std::cerr << "col comm is invalid!" << std::endl;}
+		mpi::communicator next = col_comm[ i-1].split( col_comm[i-1].rank() > 0);
+		if (next.size() == 1){ break; }
+		col_comm.emplace_back( next, mpi::comm_duplicate); 
 	}
 }
 } //end namespace 10
