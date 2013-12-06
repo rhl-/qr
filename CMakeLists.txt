@@ -11,20 +11,6 @@ set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
 set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-### usually each subfolder has this
-include_directories (
-${MPI_INCLUDE_PATH}
-/home/rhl/boost/include
-)
-
-link_directories (
-${MPI_LIBRARIES}
-/home/rhl/boost/lib
-)
-
-
-#add_executable(qrs qr_serial.cpp)
-add_executable(qrp qr_distributed.cpp)
-#target_link_libraries(qrs ${MPI_LIBRARIES} ${Boost_LIBRARIES} boost_program_options)
-target_link_libraries(qrp ${MPI_LIBRARIES} boost_serialization 
-			  boost_program_options boost_mpi)
+add_subdirectory(serial)
+add_subdirectory(distributed)
+add_subdirectory(io)

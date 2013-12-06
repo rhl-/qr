@@ -7,6 +7,7 @@
 #include <boost/numeric/ublas/banded.hpp> //for banded_adaptor
 
 namespace ublas = boost::numeric::ublas;
+namespace serial = t10::serial;
 
 typedef ublas::vector< double > Vector;
 typedef ublas::matrix< double> Matrix;
@@ -26,8 +27,8 @@ int main( int argc, char * argv[]){
 	M2(0,1) = 24; 
 	M2(1,0) = 69; 
 	M2(1,1) = 12;
-	t10::qr(M1);
-	t10::qr(M2);
+	serial::qr(M1);
+	serial::qr(M2);
 	std::cout << t10::print_matrix(M1) << std::endl << t10::print_matrix(M2) << std::endl;
 	const double correct_hess[3][3] = 
   	{{ 5.000000000000000,   -4.024922359499620,    1.341640786499874},
@@ -61,7 +62,7 @@ int main( int argc, char * argv[]){
 	HM = M;
 	//Householder Vector Test
 	std::cout << "Input: " << V << std::endl;
-	t10::compute_householder_vector(V);
+	t10::serial::compute_householder_vector(V);
 	double beta = V(0); V(0) = 1;
 	std::cout << "beta: " << beta << " correct: " << correct_beta << std::endl;
 	std::cout << "V: " << V << " correct V: " << CV << std::endl;
