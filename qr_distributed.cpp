@@ -42,12 +42,19 @@ int main( int argc, char * argv[]){
 	mpi::environment env(argc, argv);
 	mpi::timer t;
 	Matrix_data data;
+	po::variables_map vm;
+	t10::process_args( argc, argv, vm);
+	std::string filename( vm[ "input-file"].as< std::string>());
 	std::cout << env.processor_name() << " <----> " 
 		  << data.world.rank() << " " << t.elapsed()
 		  << std::flush << std::endl;
 	#ifdef REDIRECT_OUTPUT
 	std::stringstream ss;
-	ss << "output/out." << data.world.rank();
+	std::size_t pos = filename.rfind("/");
+	std::size_t pos1 = filename.rfind(".");
+	if (pos == std::string::npos){ pos = 0; };
+	ss << "output/" << filename.substr( pos, pos1) 
+			<< "."<<  data.world.rank();
 	std::ofstream out(ss.str().c_str());
         std::streambuf *cerrbuf = std::cerr.rdbuf(); //save old buf
         std::streambuf *coutbuf = std::cout.rdbuf(); //save old buf
@@ -62,9 +69,6 @@ int main( int argc, char * argv[]){
 	std::cout << "barrier took: " << t.elapsed() << std::endl;	
 	//read input
 	t.restart();
-	po::variables_map vm;
-	t10::process_args( argc, argv, vm);
-	std::string filename( vm[ "input-file"].as< std::string>());
 	std::cout << "read matrix" << std::flush;
 	t10::read_matrix( filename, data);
 	std::cout << "... done " << t.elapsed() << std::endl 
@@ -72,18 +76,11 @@ int main( int argc, char * argv[]){
 	t.restart();
 	t10::construct_communicators( data);
   	std::cout << "... done " << t.elapsed() << std::endl;	
-	/*std::cout << data.world.rank() 
-		  << " has a " 
-		  << data.M.size1() << " x " << data.M.size2() 
-		  << std::endl << std::flush;
-	if (data.world.rank() == 0){ 
-		std::cout << "--------------------" << std::endl << std::flush;
-	}
-	*/
+	t.restart();
+	std::cout << "qr iteration" << std::flush;
 	t10::parallel::qr( data);
-	std::cerr << data.world.rank() << " is out of qr!" << std::endl;
+	std::cout << "... done " << t.elapsed() << std::endl;
 	std::cerr << t10::print_matrix( data.M) << std::endl;
-	std::cout << "-------------------------------" << std::endl << std::endl;
 	#ifdef REDIRECT_OUTPUT
 	std::cerr.rdbuf(cerrbuf); //reset to standard output again
 	std::cout.rdbuf(coutbuf); //reset to standard output again

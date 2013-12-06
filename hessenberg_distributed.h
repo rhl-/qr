@@ -1,6 +1,5 @@
 #ifndef HESSENBERG_DISTRIBUTED_H
 #define HESSENBERG_DISTRIBUTED_H
-#define QR_ITERATION_OUTPUT
 
 //BOOST MPI
 #include <boost/mpi/communicator.hpp>
@@ -81,7 +80,9 @@ namespace t10 {
 
 	template< typename Matrix_data>
 	void apply_householder( Matrix_data & data, const std::size_t & k){ 
+	    #ifdef HESSENBERG_OUTPUT
 	std::cout << "apply_householder" << std::endl;
+	#endif
 	typedef typename Matrix_data::Communicator Communicator; 
 	typedef typename Matrix_data::Matrix Matrix; 
 	typedef typename Matrix::value_type Value;
@@ -111,7 +112,9 @@ namespace t10 {
 
 	//Step 1: If there is data to receive, grab it	
 	if( !last_row ){ 
+	    #ifdef HESSENBERG_OUTPUT
 		std::cout << "row bcast" << std::endl;
+		#endif
 		mpi::broadcast( data.row_comm[ block_col], vb_left, 0);
 	}
 	Vector v_left = ublas::subrange(vb_left, 1, vb_left.size());
@@ -121,25 +124,33 @@ namespace t10 {
 	vb_right.resize( M.size1()+1, M.size1()==M.size2());
 
 	//Step 2: Send/Receive the vector necessary for right applications
+	    #ifdef HESSENBERG_OUTPUT
 	std::cout << "col bcast" << std::flush;
+	    #endif
 	mpi::broadcast( data.col_comm[ 0],  vb_right, col_root);
+	    #ifdef HESSENBERG_OUTPUT
 	std::cout << "... done" << std::endl;
+	    #endif
 	Vector v_right = ublas::subrange(vb_right, 1, vb_right.size());
 	const Value beta = vb_right[ 0];
 	//Step 3: Apply the right householder matrix, sometimes in serial
 	if( serial){
+	    #ifdef HESSENBERG_OUTPUT
 	     std::cout << "id: " << data.world.rank() 
 	      	       << " applying: " << v_right << " on the right in serial"
 		       << std::endl;
-	    serial::apply_householder_right( beta, v_right, M, 
+	    #endif
+	     serial::apply_householder_right( beta, v_right, M, 
 					     column_index*(on_the_left), 
 				             on_the_left);
 	} else {
 	    const std::size_t comm_idx = block_col + on_boundary_column;
+	    #ifdef HESSENBERG_OUTPUT
 	    std::cout << "before right apply_householder" << std::endl; 
 	    std::cout << "data.row_comm.size(): " << data.row_comm.size() << std::endl;
 	    std::cout << "comm_idx: " << comm_idx << std::endl;
-	    //When we are on a boundary column one less processor is involved.
+	   #endif 
+	   //When we are on a boundary column one less processor is involved.
 	    apply_householder_right( beta, 
 	   			 M, column_index, 
 	   			 v_right, 
@@ -150,12 +161,16 @@ namespace t10 {
 
 	//Step 4: Apply the left householder matrix, sometimes in serial	
 	if (!last_row && serial){ 
+	    #ifdef HESSENBERG_OUTPUT
 	      std::cout << "serial left apply_householder" << std::endl; 
+             #endif
 		serial::apply_householder_left( beta, v_left, M, 0, 0); 
 		return;
 	}
 	if ( !last_row ) {
+	    #ifdef HESSENBERG_OUTPUT
 	    std::cout << "before left apply_householder" << std::endl; 
+	    #endif
 	    const bool on_the_top = (block_col == data.block_row); 
 	    const std::size_t comm_idx = block_col + on_boundary_column;
 	    apply_householder_left( beta, M, column_index,
@@ -168,7 +183,9 @@ namespace t10 {
 	
 	template< typename Matrix_data>
 	void dist_reduce_column( Matrix_data & data, const std::size_t & k){
+	     #ifdef HESSENBERG_OUTPUT
 	     std::cout << "dist_reduce_column" << std::endl;
+	     #endif
 	     typedef typename Matrix_data::Matrix Matrix;
 	     typedef typename Matrix::value_type Value;
 	     typedef typename ublas::matrix_column< Matrix> Matrix_column;
@@ -206,9 +223,11 @@ namespace t10 {
 	      beta = compute_householder_vector( v_left, 
 					data.col_comm[ col_comm_idx]);
 	     }
+		#ifdef HESSENBERG_OUTPUT
 	     std::cout << "id: " << data.world.rank() 
 		       << " created: " 
 		       << v_left << std::endl;	
+	      #endif
 	     //Step 2: Package and send householder vector 
 	     //        used for left householder applications 
 	     //        across current active row 
@@ -223,21 +242,27 @@ namespace t10 {
 		 mpi::broadcast( data.col_comm[ 0], w, col_root);
 	     } 
 	     Vector v_right = ublas::subrange(w, 1, w.size());
+		#ifdef HESSENBERG_OUTPUT
 	     std::cout << "id: " << data.world.rank() 
 		       << " recv'd: " 
 		       << v_right << std::endl;	
+		#endif
 	     //Step 4: Apply Householder on the right, sometimes in serial
 	     const bool on_the_left = (comm_idx == data.block_col); 
 	    if( !on_last_col && last_block_col){
+		#ifdef HESSENBERG_OUTPUT
 	     std::cout << "id: " << data.world.rank() 
 	      	       << " applying: " << v_left << " on the right in serial"
 		       << std::endl;
+		#endif
 		serial::apply_householder_right( beta, v_left, M, 
 						 column_index, on_the_left);
 	     }else if(!on_last_col && !penult_boundary_col){
+		#ifdef HESSENBERG_OUTPUT
 		std::cout << "id: " << data.world.rank() 
 	      	      << " applying: " << v_right << " on the right in parallel"
 		      << std::endl;
+		#endif
 	      apply_householder_right( beta, M, column_index, v_right,
 				      	 data.row_comm[ comm_idx], 
 					 data.world.rank(), 
@@ -249,19 +274,22 @@ namespace t10 {
 			ublas::matrix_column< Matrix> pv(M, M.size2()-1);
 			const Value sign = (pv[ 0] < 0)?-1:1;
 			const Value beta = sign*ublas::norm_2(pv);
-			std::cout << "beta will be: " << beta << std::endl;
 			pv( 0) = beta;
 			std::fill(pv.begin()+1,pv.end(),0.0f);
 			return; 
 		}
+		#ifdef HESSENBERG_OUTPUT
 		std::cout << "id: " << data.world.rank() 
 	      	       << " applying: " << v_left << " on the left in serial"
 		       << std::endl;
+		#endif
 		serial::apply_householder_left( beta, v_left, M, column_index);
 	     } else{
+		#ifdef HESSENBERG_OUTPUT
 		std::cout << "id: " << data.world.rank() 
 	      	       << " applying: " << v_left << " on the left in parallel"
 		       << std::endl;
+		#endif
 	     const bool on_the_top = (comm_idx == data.block_row);
 	     apply_householder_left( beta,  M, column_index,  v_left,
 				     data.col_comm[ col_comm_idx], 
@@ -276,8 +304,10 @@ namespace t10 {
 	    //Algorithm 7.4.2 GVL
 	    for (std::size_t k = 0; k < n-2; ++k){
 		const std::size_t col_idx = block_column_index(k, p, n);
+		#ifdef HESSENBERG_OUTPUT
 		std::cout << "k: " << k << std::endl
 			  << print_matrix( data.M) << std::endl; 
+		#endif
 		const bool on_last_col = (k == data.last_col-1); 
 		if (data.block_col < col_idx){ return; }
 		if (on_last_col && data.diag()) { return; }

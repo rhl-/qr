@@ -74,7 +74,6 @@ Iterator vec_multiply( Iterator begin, Iterator end, const T & t){
 
 template< typename Matrix_data>
 void construct_communicators( Matrix_data & data){
-	mpi::timer t;
 	typedef typename Matrix_data::Communicator Communicator;
 	typedef typename Matrix_data::Vector_comm Vector_comm;
 	typedef typename std::vector< std::size_t> Vector;
