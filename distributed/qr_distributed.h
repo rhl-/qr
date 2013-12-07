@@ -34,6 +34,8 @@ namespace t10 {
 	}
 	template< typename Matrix_data>
 	void shift_matrix( Matrix_data & data, int sign=-1){
+		typedef typename Matrix_data::Matrix Matrix;
+		typedef typename Matrix::value_type Value;
 		typedef typename ublas::diagonal_adaptor< Matrix> 
 						  Diagonal_adaptor;
 		typedef typename ublas::scalar_matrix< Value> Scalar;
@@ -51,12 +53,12 @@ namespace t10 {
 
 	template< typename Matrix_data>
 	void qr_iteration( Matrix_data & data, double tol=1e-16){
-		#ifdef QR_ITERATION_OUTPUT
-		std::cout << "H = " << print_matrix( H) << std::endl;
-		#endif
 		typedef typename Matrix_data::Matrix Matrix;	
 		typedef typename Matrix::value_type Value;
 		Matrix & H = data.M;
+		#ifdef QR_ITERATION_OUTPUT
+		std::cout << "H = " << t10::print_matrix( H) << std::endl;
+		#endif
 		const std::size_t n = H.size1();
 		std::vector< typename Matrix::value_type> givens(n-1, 0.0); 
 		bool done = false;
@@ -86,7 +88,7 @@ namespace t10 {
 			
 			#ifdef DEBUG_QR_ITERATION
 			std::cout << "Left Apply: H = " 
-				  << print_matrix( H) << std::endl;
+				  << t10::print_matrix( H) << std::endl;
 			#endif //DEBUG_QR_ITERATION
 			
 			for (std::size_t i = 0; i < n-1; ++i){ 
@@ -95,19 +97,19 @@ namespace t10 {
 			
 			#ifdef DEBUG_QR_ITERATION
 			std::cout << "Right Apply H = " 
-				  << print_matrix( H) << std::endl;
+				  << t10::print_matrix( H) << std::endl;
 			#endif //DEBUG_QR_ITERATION
 			
 			//Unshift
 			if( data.diag()){ shift_matrix( data, 1); }
 			
 			#ifdef QR_ITERATION_OUTPUT
-			std::cout.precision( 7);
-			std::cout.setf( std::ios::fixed, std:: ios::floatfield);
-			std::cout << "---- Shift: " << std::setw( 10) 
-				  << shift  << std::endl;
-			std::cout << "---- Error: " << std::setw( 10) 
-				  << std::fabs(H(n-1,n-2)) << std::endl;
+			//std::cout.precision( 7);
+			//std::cout.setf(std::ios::fixed,std:: ios::floatfield);
+			//std::cout << "---- Shift: " << std::setw( 10) 
+			//	  << shift  << std::endl;
+			//std::cout << "---- Error: " << std::setw( 10) 
+			//	  << std::fabs(H(n-1,n-2)) << std::endl;
 			#endif //DEBUG_QR_ITERATION
 			if( data.diag()){
 				//std::size_t idx = in_charge(data, i); 
@@ -116,7 +118,7 @@ namespace t10 {
 					//bcast empty givens package across row
 				}
 			}
-		} while( !done) 
+		} while( !done); 
 	}
 	
 	template< typename Matrix_data>
@@ -125,7 +127,7 @@ namespace t10 {
 			//for (std::size_t i = data.n; i > 1; --i){
 			//	Range r( begin, end);
 			//	Matrix_range R(M, r, r);
-			qr_iteration( data);
+			//qr_iteration( data);
 			//}
 	}
 
