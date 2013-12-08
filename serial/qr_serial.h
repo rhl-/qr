@@ -38,13 +38,17 @@ namespace t10 {
 	template< typename Value>
 	void decode_givens( const Value & rho, Value & c, Value & s ){
 		if (rho == 1) { c = 0; s = 1; return; }
-		if (std::fabs(rho) < 1) {s = 2*rho; c = std::sqrt(1 -std::pow(s,2)); return;}
+		if (std::fabs(rho) < 1) {
+		s = 2*rho; c = std::sqrt(1 -std::pow(s,2)); 
+		return;
+		}
 		c = 2/rho; s = std::sqrt(1-std::pow(c,2));
 	} 
 	
 	template< typename Matrix>
 	typename Matrix::value_type apply_givens_left( Matrix & M, 
-						       const std::size_t i, const std::size_t k){
+						       const std::size_t i, 
+						      const std::size_t k){
 		typedef typename Matrix::value_type Value;
 		Value c=0.0, s=0.0;
 		compute_givens(M(i,i),M(k,i),c,s);
@@ -58,7 +62,8 @@ namespace t10 {
 		return encode_givens(c,s);
 	}
 	template< typename Matrix>
-	void apply_givens_right( Matrix & M, const typename Matrix::value_type rho, 
+	void apply_givens_right( Matrix & M, 
+				 const typename Matrix::value_type rho, 
 				 const std::size_t i, const std::size_t k){
 		typename Matrix::value_type c=0.0,s=0.0;
 		decode_givens(rho, c,s);
@@ -72,7 +77,6 @@ namespace t10 {
 	}
 
 	//TODO: Specialize for symmetric matrices
-	
 	template< typename Matrix>
 	void qr_iteration( Matrix & H, double tol=1e-16){
 		#ifdef QR_ITERATION_OUTPUT
