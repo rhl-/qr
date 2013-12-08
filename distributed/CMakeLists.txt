@@ -12,5 +12,8 @@ ${MPI_LIBRARIES}
 )
 
 add_executable(qrp qr_distributed.cpp)
+add_executable(hessp hessenberg.cpp)
 target_link_libraries(qrp ${MPI_LIBRARIES} boost_serialization 
 			  boost_program_options boost_mpi)
+target_link_libraries(hessp ${MPI_LIBRARIES} boost_serialization 
+                          boost_program_options boost_mpi)
