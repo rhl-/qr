@@ -22,13 +22,19 @@ namespace po = boost::program_options;
 
 namespace t10 {
 	//TODO: Delimiter should be passed into program as an option 
+	template< typename Stream, typename Matrix>
+	bool read_csv( Stream & in, Matrix & M, const bool flag, char delimiter=','){
+		return read_csv( in, M, 0, 1, delimiter);
+	}
+
 	template< typename Stream, typename Matrix_data>
 	bool read_csv( Stream & in, Matrix_data & data, char delimiter=','){
-		typedef typename Matrix_data::Matrix Matrix;
-		typedef typename Matrix_data::Communicator Communicator;
+		return read_csv( in, data.M, data.world.rank(), data.world.size(), delimiter);	
+	}
+	
+	template< typename Stream, typename Matrix>
+	bool read_csv( Stream & in, Matrix & M, const std::size_t proc_id, const std::size_t num_proc, char delimiter){
 		typedef typename std::pair<std::size_t, std::size_t> Block;
-		const Communicator & world = data.world;
-		Matrix & M = data.M;
 		std::string line;
 
 		//Step 0: Get first line
@@ -57,11 +63,9 @@ namespace t10 {
 		//matrix is well formatted, now get the size of the 
 		//blocks for each processor
 		//1. calculate equally sized block sizes and remaining entries
-		const std::size_t num_proc = world.size();
 		//for now ignore the fact that number of processors 
 		//is not perfect square
-		const std::size_t p = std::sqrt(world.size());
-		const std::size_t proc_id = world.rank();
+		const std::size_t p = std::sqrt(num_proc);
 		const std::size_t avg_block_size = number_of_rows / p;
 		//row size of block before resizing
 		std::size_t block_size1 = avg_block_size;
@@ -137,6 +141,24 @@ namespace t10 {
 	bool read_mat( Stream & in, Matrix_data & data){
 		std::cerr << "Not Yet Implemented Yet" << std::endl;
 		return false;
+	}
+
+	template< typename String, typename Matrix>
+	void read_matrix( const String & filename Matrix & M, const bool flag){
+		const std::string file_ext( 
+		filename.substr( filename.find_last_of(".") + 1));
+		std::ifstream in(filename.c_str());
+		//TODO: Error checking if file doesn't open.
+		if (file_ext == "csv") {
+			if (!read_csv( in, M, flag)){
+				std::cerr << "Error Reading CSV file";
+				std::cerr << std::endl;
+				std::exit( -1);
+			}
+		}else{
+			std::cerr << "format not supported." << std::endl;
+			std::exit( -1);
+		}
 	}
 
 	template< typename String, typename Matrix_data>

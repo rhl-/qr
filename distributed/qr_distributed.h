@@ -56,61 +56,77 @@ namespace t10 {
 	   std::copy( source.begin(), source.end(), dest.begin());
 	}
 
+	template< typename Matrix, typename Vector>
+	void copy_ghost_row( Matrix & H, const Vector & _row, 
+			     const std::size_t row_index=0){
+	   typedef typename ublas::matrix_row< Matrix> Matrix_row;
+	   Matrix_column row(H,row_index);
+	   copy_vector( _row, row);
+	}
+
 	template< typename Matrix, typename Matrix_data>
-	void recv_ghost_boundary_row( Matrix & H, 
+	mpi::request irecv_ghost_boundary_row( Matrix & H, 
 					  Matrix_data & data, 
 					  const std::size_t comm_idx){
 	   typedef typename ublas::matrix_row< Matrix> Matrix_row;
 	   const mpi::communicator & comm = data.acol_comm;
-	   H.resize(H.size1()+1, H.size2(), true); 
+	   //TODO: move to outside of loop: 
 	   Matrix_row last_row(H,H.size1()-1);
 	   Vector _row;
-	   comm.recv( comm.rank()+1, comm.rank(), _row);
-	   copy_vector( _row, last_row);
+	   return comm.irecv( comm.rank()+1, comm.rank(), _row);
 	}
 
 	template< typename Matrix, typename Matrix_data>
-	void isend_ghost_boundary_row( Matrix & H, 
+	mpi::request isend_ghost_boundary_row( Matrix & H, 
 					  Matrix_data & data, 
-					  const std::size_t comm_idx){
-	   typedef typename ublas::matrix_row< Matrix> Matrix_row;
+					  const std::size_t comm_idx,
+					  const bool retv=false){
+	   //TODO: use retv to return the vector after done with it.
 	   const mpi::communicator & comm = data.acol_comm;
-	   Matrix_row first_row(H,0);
-	   comm.isend( comm.rank()-1, comm.rank(), last_col);
+	   return comm.isend( comm.rank()-1, comm.rank(), last_col);
 	}
-
-	template< typename Matrix, typename Matrix_data>
-	void recv_ghost_boundary_column( Matrix & H, 
-					  Matrix_data & data, 
-					  const std::size_t comm_idx){
+	
+	template< typename Matrix, typename Vector>
+	void copy_ghost_column( Matrix & H, const Vector & _col, 
+				const std::size_t column_index=0){
 	   typedef typename ublas::matrix_column< Matrix> Matrix_column;
-	   const mpi::communicator & comm = data.arow_comm[ comm_idx];
-	   H.resize(H.size1(), H.size2()+1, true); 
-	   Matrix_column last_col(H,H.size2()-1);
-	   Vector _col;
-	   comm.recv( comm.rank()+1, comm.rank(), _col);
+	   Matrix_column last_col(H, column_index);
 	   copy_vector( _col, last_col);
 	}
-
+	
 	template< typename Matrix, typename Matrix_data>
-	void isend_ghost_boundary_column( Matrix & H, 
+	mpi::request irecv_ghost_boundary_column( Matrix & H, 
 					  Matrix_data & data, 
-					  const std::size_t comm_idx){
-	        typedef typename ublas::matrix_column< Matrix> Matrix_column;
-		const mpi::communicator & comm = data.arow_comm[ comm_idx];
-		Matrix_column first_col(H,0);
-		comm.isend( comm.rank()-1, comm.rank(), first_col);
+					  const std::size_t comm_idx,
+					  const std::size_t retv=false){
+	   //TODO: use retv to return the vector after done with it.
+	   const mpi::communicator & comm = data.arow_comm[ comm_idx];
+	   Vector _col(H.size1(),0);
+	   return comm.irecv( comm.rank()+1, comm.rank(), _col);
 	}
 
 	template< typename Matrix, typename Matrix_data>
-	void ghost_rows( Matrix & H, Matrix_data & data, 
+	mpi::request isend_ghost_boundary_column( Matrix & H, 
+					  Matrix_data & data, 
+					  const std::size_t comm_idx,
+					  const std::size_t retv=false){
+		typedef typename ublas::matrix_column< Matrix> Matrix_column;
+	        //TODO: use retv to return the vector after done with it.
+		const mpi::communicator & comm = data.arow_comm[ comm_idx];
+		Matrix_column first_col(H,0);
+		return comm.isend( comm.rank()-1, comm.rank(), first_col);
+	}
+
+	template< typename Matrix, typename Matrix_data>
+	mpi::request ghost_rows( Matrix & H, Matrix_data & data, 
 			 const std::size_t comm_idx){
+	        //send row upstairs if you can
 		if (data.block_row != 0){
 		 isend_ghost_boundary_row( H, data, comm_idx);
 		}
-
+		//if row is waiting, get it.
 		if (!data.diag()){
-		 recv_ghost_boundary_row( H, data, comm_idx);
+		 return irecv_ghost_boundary_row( H, data, comm_idx);
 		}
 	}
 
@@ -135,6 +151,7 @@ namespace t10 {
 	 const mpi::communicator& comm = data.diag_comm[ comm_idx];
 	 const bool not_on_right = (data.block_col != block_index);
 	 
+	 //TODO: check if new_row arrived yet
 	 //wait until it is your turn to do left givens applies
 	 if( comm.rank() ){ comm.recv( comm.rank()-1, mpi::any_tag); }
 	 for (std::size_t i = 0; i < n-1; ++i){ 
@@ -145,19 +162,23 @@ namespace t10 {
 	  const mpi::communicator& row_comm = data.row_comm[comm_idx];
 	  mpi::bcast( row_comm, givens, 0);
 	 }
+
 	 //TODO: isend message on diag_comm to start next row
-	 //technically this is the RQ step, but, there is no harm in 
-	 //doing this computation right now. so sans a column we can do this.
+	
+	 //RQ: there is no harm in doing this computation right now.
+	 //sans receiving a column we can do this.
 	 for (std::size_t i = 0; i < n-1; ++i){
 	      //might need to ignore the last column
 	      apply_givens_right(H,givens[i],i,i+1); 
 	 }
+
 	 //if you have someone to tell, bcast givens up column 
 	 if(data.block_row != 0){
 	  const mpi::communicator& col_comm = data.acol_comm;
 	  mpi::bcast( col_comm, givens, col_comm.size()-1); 	
 	 }
 	}
+
 	template< typename Matrix, typename Matrix_data, typename Givens>
 	void diag_proc_rq( Matrix & H, Matrix_data & data, Givens & givens){
 		//TODO: wait for column to arrive,
@@ -181,10 +202,13 @@ namespace t10 {
 			      const std::size_t comm_idx, 
 			      const std::size_t block_index){
 	  const mpi::communicator& row_comm = data.row_comm[comm_idx];
+	  //TODO: unghost_row() //nonblocking receive
 	  //Receive givens package from diagonal element to my left.
 	  mpi::bcast( row_comm, givens, 0);
+	  //TODO: wait for row to actually receive
 	  //TODO: write me --> apply_givens_left(H,givens);
 	}
+
 	template< typename Matrix, typename Matrix_data>
 	void qr_iteration( Matrix & H, Matrix_data & data, 
 			   const std::size_t block_index, 
@@ -194,9 +218,10 @@ namespace t10 {
 		std::cout << "H = " << t10::print_matrix( H) << std::endl;
 		#endif
 		const std::size_t n = H.size1();
-		const bool not_on_right = (data.block_col != block_index);
+		const bool not_on_right  = data.block_col != block_index;
 		const bool not_on_bottom = data.block_row != block_index;
-		
+		if(not_on_right) { H.resize(H.size1(), H.size2()+1, true); }
+	  	if(!data.diag()) { H.resize(H.size1()+1, H.size2(), true); }
 		std::vector< Value> givens(n-1, 0.0);
 		const std::size_t comm_idx = data.row_length-1-block_index; 
 		bool done = false;
@@ -206,9 +231,11 @@ namespace t10 {
 		  if (data.diag()){ shift_matrix( data); }
 		  
 		  //Step 1: Ghost Rows
-		  ghost_rows( H, data, comm_idx);
-
+		  mpi::request new_row = ghost_rows( H, data, comm_idx);
 		  //Step 2: Do a dance
+		  //Essentially: a) do QR
+		  //             b) ghost columns
+		  //             c) do RQ
 		  if(data.diag()) { 
 		     diag_proc_qr( H, data, givens, comm_idx, block_index); 
 		     #ifdef DEBUG_QR_ITERATION
@@ -243,13 +270,8 @@ namespace t10 {
 		  //std::cout << "---- Error: " << std::setw( 10) 
 		  //	  << std::fabs(H(n-1,n-2)) << std::endl;
 		  #endif //DEBUG_QR_ITERATION
-		  if( data.diag()){
-		  	//std::size_t idx = in_charge(data, i); 
-		  	//mpi::broadcast( data.diag_comm, done, idx); 
-		  	if (done){
-		  		//bcast empty givens package across row
-		  	}
-		  }
+		  //done = (is_in_charge)? stopping_cond: false;
+		  //mpi::broadcast(current_world, done, bottom_right_corner);
 		  //} while( !done); 
 		*/
 	}
